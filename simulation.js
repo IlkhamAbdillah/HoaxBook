@@ -25,10 +25,6 @@ const INTELLIGENCE_CATEGORIES = {
     pintar: { mu: 12.5, sigma: 4.17, min: 0, max: 25, label: 'Pintar' },
 };
 
-const CREDIBILITY_CATEGORIES = {
-    trustworthy: { mu: 0.80, sigma: 0.067, min: 0.6, max: 1.0, label: 'Dapat Dipercaya' },
-    untrustworthy: { mu: 0.30, sigma: 0.067, min: 0.1, max: 0.5, label: 'Tidak Dapat Dipercaya' },
-};
 
 const FYP_CATEGORIES = {
     fyp: { mu: 0.75, sigma: 0.083, min: 0.5, max: 1.0, label: 'FYP' },
@@ -242,13 +238,10 @@ function createAgents(N, muFollower, sdFollower, intelligenceCategory) {
 // p(TtR) + p(TtT) + p(TtF) = 1
 
 function computeTransProbs(agent, params) {
-    const { credibility, fypRate, sigma, gamma } = params;
+    const { fypRate, sigma, gamma } = params;
 
-    // Pengaruh kepercayaan agen terhadap konten
-    // Threshold fixed at 50 — category controls distribution
-    const believeProb = agent.trustScore > TRUST_THRESHOLD
-        ? credibility  // agen gampang percaya → ikuti credibility
-        : credibility * 0.4; // agen skeptis → diturunkan
+    // Pengaruh murni dari tingkat kepercayaan bawaan agen terhadap konten
+    const believeProb = agent.trustScore / 100;
 
     return {
         // Dari R (Exposed/receiving)
@@ -261,9 +254,9 @@ function computeTransProbs(agent, params) {
         pDtF: 0.8,                          // berhenti, tidak menyebarkan
 
         // Dari B (Believe)
-        pBtT: sigma * credibility,          // menyebarkan (T)
+        pBtT: sigma,                        // menyebarkan (T)
         pBtR: 0.1,                          // urung, kembali menerima
-        pBtF: Math.max(0, 1 - sigma * credibility - 0.1), // final tanpa sebarkan
+        pBtF: Math.max(0, 1 - sigma - 0.1), // final tanpa sebarkan
 
         // Dari T (Transmitting)
         pTtT: 1 - gamma,                    // tetap menyebarkan
@@ -291,7 +284,7 @@ function stepAgents(agents, params, day) {
 
                 // P(terekspos) = 1 - (1 - beta)^kontak_i
                 // beta combines FYP rate and believe probability
-                const believeProb = agent.trustScore > 50 ? params.credibility : params.credibility * 0.4;
+                const believeProb = agent.trustScore / 100;
                 const beta = params.fypRate * believeProb;
 
                 const pTerekspos = 1 - Math.pow(1 - beta, kontak_i);
@@ -369,20 +362,13 @@ function runSimulation(config) {
         N, muFollower, sdFollower,
         posterMuFollower, posterSdFollower,
         posterType,
-        credibilityCategory, fypCategory, intelligenceCategory,
+        fypCategory, intelligenceCategory,
         sigma, gamma, T,
         I0 = 1
     } = config;
 
     // Poster multiplier (dari tipe akun)
     const pMult = (ACCOUNT_CATEGORIES[posterType]?.mult) || 1.0;
-
-    // Determine credibility from category
-    let credibility;
-    const credCat = CREDIBILITY_CATEGORIES[credibilityCategory];
-    credibility = credCat
-        ? randNormClamped(credCat.mu, credCat.sigma, credCat.min, credCat.max)
-        : 0.4;
 
     // Determine FYP rate from category
     let fypRate;
@@ -391,7 +377,6 @@ function runSimulation(config) {
         ? randNormClamped(fypCat.mu, fypCat.sigma, fypCat.min, fypCat.max)
         : 0.2;
 
-    const effCredibility = Math.min(credibility * pMult, 0.98);
     const effFyp = Math.min(fypRate * pMult, 0.98);
 
     const agents = createAgents(N, muFollower, sdFollower, intelligenceCategory);
@@ -411,7 +396,7 @@ function runSimulation(config) {
         agents[i].history = [agents[i].status];
     }
 
-    const params = { credibility: effCredibility, fypRate: effFyp, sigma, gamma };
+    const params = { fypRate: effFyp, sigma, gamma };
 
     // Timeline
     const timeline = [countStates(agents)];
@@ -486,8 +471,8 @@ function runSimulation(config) {
         peakER,
         waktuViral,
         waktuRedam,
-        params: { effCredibility, effFyp, pMult },
-        sampledValues: { credibility, fypRate }
+        params: { effFyp, pMult },
+        sampledValues: { fypRate }
     };
 }
 
@@ -523,5 +508,5 @@ function runMonteCarlo(config, runs = 5) {
 
 window.SimEngine = {
     runSimulation, runMonteCarlo, createAgents, countStates, ViralEngine,
-    INTELLIGENCE_CATEGORIES, CREDIBILITY_CATEGORIES, FYP_CATEGORIES, ACCOUNT_CATEGORIES
+    INTELLIGENCE_CATEGORIES, FYP_CATEGORIES, ACCOUNT_CATEGORIES
 };

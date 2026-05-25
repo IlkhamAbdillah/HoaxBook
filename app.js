@@ -15,7 +15,6 @@ const SIM_DAYS = 40;
 let params = {
     posterType: 'ordinary',
     platform: 'facebook',
-    credibilityCategory: 'trustworthy',
     posterMuFollower: 30, posterSdFollower: 6,
     muFollower: 30, sdFollower: 6,
     fypCategory: 'fyp',
@@ -59,7 +58,6 @@ function closeModal(id) {
 
 // ── Parameter Management ───────────────────────────────────
 function saveParams() {
-    const cCat = $('pCredCat').value;
     const fCat = $('pFypCat').value;
     const iCat = $('pIntCat').value;
     const pType = $('pPosterType').value;
@@ -74,7 +72,6 @@ function saveParams() {
     params = {
         posterType: pType,
         platform: pPlat,
-        credibilityCategory: cCat,
         posterMuFollower: posterMu,
         posterSdFollower: posterSd,
         muFollower: agentMu,
@@ -94,7 +91,6 @@ function updateParamSummary() {
     $('ps-poster').textContent = SimEngine.ACCOUNT_CATEGORIES[params.posterType]?.label || '—';
     $('ps-mu').textContent = params.platform.charAt(0).toUpperCase() + params.platform.slice(1) + ' (' + fmt(params.posterMuFollower) + ')';
     $('ps-fyp').textContent = SimEngine.FYP_CATEGORIES[params.fypCategory]?.label || '—';
-    $('ps-cred').textContent = SimEngine.CREDIBILITY_CATEGORIES[params.credibilityCategory]?.label || '—';
     $('ps-n').textContent = params.N;
 }
 
@@ -154,7 +150,6 @@ async function runAnimatedSimulation() {
         posterMuFollower: params.posterMuFollower,
         posterSdFollower: params.posterSdFollower,
         posterType: params.posterType,
-        credibilityCategory: params.credibilityCategory,
         fypCategory: params.fypCategory,
         intelligenceCategory: params.intelligenceCategory,
         sigma: params.sigma,
@@ -182,7 +177,6 @@ async function runAnimatedSimulation() {
 
     // Params recap — show engagement metrics instead of R0
     $('spr-poster').textContent = SimEngine.ACCOUNT_CATEGORIES[config.posterType]?.label || '—';
-    $('spr-cred').textContent = (result.sampledValues.credibility * 100).toFixed(0) + '%';
     $('spr-fyp').textContent = (result.sampledValues.fypRate * 100).toFixed(0) + '%';
     $('spr-verdict').textContent = '⏳ Menghitung...';
 
