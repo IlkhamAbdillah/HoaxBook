@@ -27,6 +27,7 @@ let lastPostData = null;
 let networkSim = null;   // D3 force simulation instance
 let nodeEls = null;   // D3 selection of circle nodes
 let linkEls = null;   // D3 selection of link lines
+let isSimRunning = false; // Guard: prevent closing sim modal while running
 
 // ── Utilities ──────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -41,6 +42,8 @@ function openModal(id) {
 }
 
 function closeModal(id) {
+    // Prevent closing the simulation modal while simulation is running
+    if (id === 'simModal' && isSimRunning) return;
     $(id).style.display = 'none';
     document.body.style.overflow = '';
 }
@@ -150,15 +153,16 @@ async function runAnimatedSimulation() {
         return a.infectedDay - b.infectedDay;
     });
 
-    // ── Open simulation modal ──
+    // ── Open simulation modal & lock it ──
+    isSimRunning = true;
     openModal('simModal');
     $('liveStatsCard').style.display = 'block';
 
-    // Params recap
+    // Params recap — show engagement metrics instead of R0
     $('spr-poster').textContent = SimEngine.ACCOUNT_CATEGORIES[config.posterType]?.label || '—';
     $('spr-cred').textContent = (result.sampledValues.credibility * 100).toFixed(0) + '%';
     $('spr-fyp').textContent = (result.sampledValues.fypRate * 100).toFixed(0) + '%';
-    $('spr-r0').textContent = result.R0;
+    $('spr-verdict').textContent = '⏳ Menghitung...';
 
     // Wait for modal to render, then init network
     await sleep(120);
@@ -203,6 +207,12 @@ async function runAnimatedSimulation() {
         $('ls-i').textContent = snap.I;
         $('ls-r').textContent = snap.R;
 
+        // Update live engagement metrics during simulation
+        if (result.hourlyEvaluations[t]) {
+            const evalT = result.hourlyEvaluations[t];
+            $('spr-verdict').textContent = evalT.verdict;
+        }
+
         // Mini chart
         drawMiniChart(result.timeline, t);
 
@@ -211,6 +221,9 @@ async function runAnimatedSimulation() {
 
     clearInterval(timerIv);
     $('simTimer').textContent = '✓';
+
+    // ── Unlock simulation modal ──
+    isSimRunning = false;
 
     await sleep(900);
     closeModal('simModal');
@@ -360,40 +373,56 @@ function drawMiniChart(timeline, tNow) {
    SHOW RESULTS — opens result modal, draws charts
    ═══════════════════════════════════════════════════════════ */
 function showResults(result, config) {
-    const { agents, timeline, R0 } = result;
+    const { agents, timeline, viralResult, finalEngagement, finalEngagementScore, peakVelocity, peakER, waktuViral, waktuRedam } = result;
     const T = timeline.length - 1;
     const N = config.N;
     const fin = timeline[T];
-    const isV = R0 > 1;
+    const isV = viralResult.isViral;
     const totExp = N - fin.S;
     const peakI = Math.max(...timeline.map(s => s.I));
     const peakD = timeline.findIndex(s => s.I === peakI);
     const belCnt = agents.filter(a => a.believed).length;
 
     // ── Verdict banner ──
-    $('verdictBanner').className = 'verdict-banner ' + (isV ? 'verdict-viral' : 'verdict-safe');
-    $('vbIcon').textContent = isV ? '🔥' : '🛡️';
-    $('vbTitle').textContent = isV
-        ? 'Hoax menyebar viral — tidak terkendali!'
-        : 'Hoax padam secara alami';
+    let verdictClass = 'verdict-safe';
+    let verdictIcon = '🛡️';
+    if (viralResult.isViral) {
+        verdictClass = 'verdict-viral';
+        verdictIcon = '🔥';
+    } else if (viralResult.verdict.includes('Impresi Tinggi')) {
+        verdictClass = 'verdict-clickbait';
+        verdictIcon = '📈';
+    } else if (viralResult.verdict.includes('Berkualitas')) {
+        verdictClass = 'verdict-niche';
+        verdictIcon = '💎';
+    }
+    $('verdictBanner').className = 'verdict-banner ' + verdictClass;
+    $('vbIcon').textContent = verdictIcon;
+    $('vbTitle').textContent = viralResult.verdict;
     $('vbDesc').textContent = isV
-        ? `R₀ = ${R0} > 1. Setiap spreader rata-rata menjangkau lebih dari satu agen baru. Total ${fmt(totExp)} dari ${fmt(N)} agen (${pct(totExp, N)}) terpapar hoax.`
-        : `R₀ = ${R0} ≤ 1. Penyebaran gagal berkembang — hanya ${fmt(totExp)} dari ${fmt(N)} agen (${pct(totExp, N)}) yang terpapar sebelum hoax padam.`;
+        ? `Velocity ${fmt(viralResult.viewVelocityPerHour)} views/jam dengan Engagement Rate ${viralResult.engagementRate}. Total ${fmt(totExp)} dari ${fmt(N)} agen (${pct(totExp, N)}) terpapar hoax.`
+        : `Velocity ${fmt(viralResult.viewVelocityPerHour)} views/jam, Engagement Rate ${viralResult.engagementRate}. Penyebaran tidak memenuhi ambang viralitas — hanya ${fmt(totExp)} dari ${fmt(N)} agen (${pct(totExp, N)}) terpapar.`;
 
     // ── Metric cards ──
-    $('rm-exposed').textContent = fmt(totExp);
-    $('rm-infected').textContent = fmt(belCnt);
-    $('rm-removed').textContent = fmt(fin.R);
-    $('rm-r0').textContent = R0;
+    $('rm-viral-time').textContent = waktuViral !== -1 ? `Hari ke-${waktuViral}` : '—';
+    $('rm-redam-time').textContent = waktuRedam !== -1 ? `Hari ke-${waktuRedam}` : '—';
+    $('rm-views').textContent = fmt(finalEngagement.views);
+    $('rm-likes').textContent = fmt(finalEngagement.likes);
+    $('rm-comments').textContent = fmt(finalEngagement.comments);
 
     // ── Insight ──
     $('insightBox').innerHTML = `
     <strong style="display:block;margin-bottom:6px">💡 Insight Analitik</strong>
     Puncak penyebar aktif (I) sebanyak <strong>${fmt(peakI)} agen</strong> terjadi
     pada hari ke-<strong>${peakD}</strong>.
+    Total <strong>${fmt(finalEngagement.views)}</strong> views, 
+    <strong>${fmt(finalEngagement.likes)}</strong> likes,
+    <strong>${fmt(finalEngagement.comments)}</strong> komentar,
+    <strong>${fmt(finalEngagement.shares)}</strong> shares.
+    Engagement Score akhir: <strong>${fmt(Math.round(finalEngagementScore))}</strong>.
     ${isV
-            ? 'Agen dengan follower tinggi berperan sebagai <em>super-spreader</em> yang mempercepat penyebaran hoax di fase awal.'
-            : 'Laju pemulihan (γ) terlalu tinggi relatif terhadap laju infeksi efektif, sehingga rantai penyebaran terputus sebelum mencapai massa kritis.'}`;
+            ? 'Konten mencapai akselerasi algoritma — velocity dan engagement rate melampaui threshold platform. Agen dengan follower tinggi berperan sebagai <em>super-spreader</em>.'
+            : 'Konten gagal mencapai threshold viralitas. Rantai penyebaran terputus sebelum mencapai momentum yang cukup untuk akselerasi algoritma.'}`;
 
     // ── Agent table ──
     populateAgentTable(agents);
@@ -567,13 +596,19 @@ function createFeedCard(result, config) {
     $('feedHint').style.display = 'none';
     const feed = $('postFeed');
 
-    const { R0, timeline, agents } = result;
-    const isV = R0 > 1;
+    const { viralResult, timeline, agents, finalEngagement } = result;
+    const isV = viralResult.isViral;
     const T = timeline.length - 1;
     const totExp = config.N - timeline[T].S;
     const belCnt = agents.filter(a => a.believed).length;
     const now = lastPostData?.timestamp || new Date();
     const tStr = now.toLocaleTimeString('id', { hour: '2-digit', minute: '2-digit' });
+
+    // Short verdict for badge
+    let badgeText = '🛡️ PADAM';
+    if (viralResult.isViral) badgeText = '🔥 VIRAL';
+    else if (viralResult.verdict.includes('Impresi Tinggi')) badgeText = '📈 CLICKBAIT';
+    else if (viralResult.verdict.includes('Berkualitas')) badgeText = '💎 NICHE';
 
     const card = document.createElement('div');
     card.className = 'post-card';
@@ -589,13 +624,13 @@ function createFeedCard(result, config) {
     ${lastPostData?.imageData
             ? `<img class="pc-img" src="${lastPostData.imageData}" alt="Post image">`
             : ''}
-    <div class="hoax-badge">${isV ? '🔥 VIRAL' : '🛡️ PADAM'} — R₀ = ${R0}</div>
+    <div class="hoax-badge">${badgeText} — ER: ${viralResult.engagementRate}</div>
     <div class="pc-stats">
       <div class="pc-reactions">
         <span>😡</span><span>😮</span><span>👍</span>
-        <span style="margin-left:4px">${fmt(totExp)} terpapar</span>
+        <span style="margin-left:4px">${fmt(finalEngagement.views)} views</span>
       </div>
-      <span>${fmt(belCnt)} percaya · ${fmt(timeline[T].R)} berhenti</span>
+      <span>${fmt(finalEngagement.likes)} likes · ${fmt(finalEngagement.shares)} shares</span>
     </div>
     <div class="pc-actions">
       <button class="pca-btn" onclick="openModal('resultModal')">📊 Lihat Detail</button>

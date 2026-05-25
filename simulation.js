@@ -45,6 +45,129 @@ const ACCOUNT_CATEGORIES = {
 // Fixed trust threshold — categories control the distribution of trust scores
 const TRUST_THRESHOLD = 50;
 
+/* ═══════════════════════════════════════════════════════════
+   ViralEngine — Engagement & Velocity Based Detection
+   ═══════════════════════════════════════════════════════════ */
+
+const ViralEngine = {
+  // Konfigurasi Bobot Algoritma Rekomendasi Platform
+  WEIGHTS: {
+    like: 1.0,
+    comment: 2.5,   // Komentar diberi bobot lebih tinggi karena memicu interaksi
+    share: 4.0      // Share paling tinggi karena memperluas jangkauan jaringan
+  },
+
+  /**
+   * Menghitung skor interaksi berdasarkan aksi pengguna
+   */
+  calculateEngagementScore(actions) {
+    const { likes, comments, shares } = actions;
+    return (likes * this.WEIGHTS.like) + 
+           (comments * this.WEIGHTS.comment) + 
+           (shares * this.WEIGHTS.share);
+  },
+
+  /**
+   * Simulasi evaluasi konten oleh algoritma setiap jamnya
+   * @param {Object} post - Data postingan saat ini
+   * @param {Array} timelineInteractions - Riwayat interaksi tiap jam [{likes, comments, shares, views}]
+   * @param {Object} threshold - Batas minimum penentu (Benchmark platform)
+   */
+  evaluateVirality(post, timelineInteractions, threshold = { velocity: 500, er: 0.05 }) {
+    const currentHour = timelineInteractions.length;
+    if (currentHour === 0) return { isViral: false, status: 'Draft/Baru' };
+
+    // 1. Ambil data jam terakhir
+    const latestData = timelineInteractions[currentHour - 1];
+    
+    // 2. Hitung Velocity (Laju Pertumbuhan Impresi per Jam)
+    const previousData = currentHour > 1 ? timelineInteractions[currentHour - 2] : { views: 0 };
+    const viewVelocity = latestData.views - previousData.views;
+
+    // 3. Hitung Real-time Engagement Rate (ER) berdasarkan proporsi totalInteractions / totalExposed
+    const totalEngagement = latestData.likes + latestData.comments + latestData.shares;
+    const engagementRate = latestData.exposed > 0 ? (totalEngagement / latestData.exposed) : 0;
+
+    // 4. Hitung Skor Akselerasi Algoritma
+    const engagementScore = this.calculateEngagementScore(latestData);
+
+    // 5. Penentuan Status Viralitas
+    const meetsVelocity = viewVelocity >= threshold.velocity;
+    const meetsEngagement = engagementRate >= threshold.er;
+    const isViral = meetsVelocity && meetsEngagement;
+
+    let verdict = 'Stagnan';
+    if (isViral) {
+      verdict = '🔥 VIRAL (Akselerasi Algoritma)';
+    } else if (meetsVelocity && !meetsEngagement) {
+      verdict = '📈 Impresi Tinggi tapi Menguap (Kurang Interaksi / Clickbait)';
+    } else if (!meetsVelocity && meetsEngagement) {
+      verdict = '💎 Berkualitas tapi Kurang Dorongan Algoritma (Cluster Kecil)';
+    }
+
+    return {
+      hour: currentHour,
+      viewVelocityPerHour: viewVelocity,
+      engagementRate: parseFloat((engagementRate * 100).toFixed(2)) + '%',
+      engagementRateRaw: engagementRate,
+      engagementScore: engagementScore,
+      isViral: isViral,
+      verdict: verdict
+    };
+  },
+
+  /**
+   * Generate simulated engagement data dari hasil ABM-SEIR
+   * Mengkonversi timeline SEIR menjadi data interaksi platform
+   */
+  generateEngagementTimeline(timeline, agents, config) {
+    const N = config.N;
+    const muFollower = config.muFollower;
+    const pMult = (ACCOUNT_CATEGORIES[config.posterType]?.mult) || 1.0;
+    const interactions = [];
+    
+    let cumulativeViews = 0;
+    let cumulativeLikes = 0;
+    let cumulativeComments = 0;
+    let cumulativeShares = 0;
+
+    for (let t = 0; t < timeline.length; t++) {
+      const snap = timeline[t];
+      // Agen yang Infected (I) aktif menyebarkan → mereka generate views dari follower mereka
+      const activeInfected = snap.I;
+      const exposed = snap.E;
+      
+      // Views: setiap penyebar aktif menjangkau rata-rata follower mereka, ditambah efek FYP
+      const newViews = Math.round(activeInfected * muFollower * pMult * (0.3 + Math.random() * 0.4));
+      cumulativeViews += newViews;
+
+      // Likes: sebagian kecil dari yang terpapar & percaya
+      const newLikes = Math.round((activeInfected + exposed * 0.3) * (5 + Math.random() * 15) * pMult);
+      cumulativeLikes += newLikes;
+
+      // Comments: lebih sedikit dari likes, tapi bobot lebih besar
+      const newComments = Math.round((activeInfected * 0.4 + exposed * 0.1) * (2 + Math.random() * 5) * pMult);
+      cumulativeComments += newComments;
+
+      // Shares: hanya agen I yang aktif share
+      const newShares = Math.round(activeInfected * (1 + Math.random() * 3) * pMult);
+      cumulativeShares += newShares;
+
+      // Total Exposed adalah N - S (seluruh agen yang bukan S lagi)
+      const totalExposed = N - snap.S;
+
+      interactions.push({
+        views: cumulativeViews,
+        likes: cumulativeLikes,
+        comments: cumulativeComments,
+        shares: cumulativeShares,
+        exposed: totalExposed
+      });
+    }
+    return interactions;
+  }
+};
+
 // ── RNG Helpers ──────────────────────────────────────
 function randNorm(mu, sd) {
     const u1 = Math.random(), u2 = Math.random();
@@ -291,50 +414,58 @@ function runSimulation(config) {
         }
     }
 
-    // ── Kalkulasi R₀ Teoritis (Basic Reproduction Number) ──
-    // Sesuai persamaan di UI: R₀ = β_eff × μ_follower / γ
-    let sumTransmittedPotential = 0;
+    // ── Kalkulasi Engagement & Velocity (ViralEngine) ──
+    const engagementTimeline = ViralEngine.generateEngagementTimeline(timeline, agents, config);
+    
+    // Evaluasi viralitas berdasarkan data engagement terakhir
+    const viralResult = ViralEngine.evaluateVirality(
+        { caption: 'sim' }, 
+        engagementTimeline,
+        { velocity: 500, er: config.N * 0.05 }
+    );
 
-    agents.forEach(a => {
-        // 1. Ambil probabilitas dasar keputusan psikologis agen (Believe atau Skeptis)
-        const believeProb = a.trustScore > TRUST_THRESHOLD ? effCredibility : (effCredibility * 0.4);
+    // Hitung peak engagement & velocity, serta waktu viral & redam
+    let peakVelocity = 0;
+    let peakER = 0;
+    let waktuViral = -1;
+    let waktuRedam = -1;
+    const hourlyEvaluations = [];
+    for (let h = 1; h <= engagementTimeline.length; h++) {
+        const evalH = ViralEngine.evaluateVirality(
+            { caption: 'sim' },
+            engagementTimeline.slice(0, h),
+            { velocity: 500, er: config.N * 0.05 }
+        );
+        hourlyEvaluations.push(evalH);
+        if (evalH.viewVelocityPerHour > peakVelocity) peakVelocity = evalH.viewVelocityPerHour;
+        if (evalH.engagementRateRaw > peakER) peakER = evalH.engagementRateRaw;
+        
+        // Track waktu viral dan redam
+        if (evalH.isViral) {
+            if (waktuViral === -1) waktuViral = h - 1; // index 0 is Day 0
+            waktuRedam = -1; // reset jika kembali viral
+        } else {
+            if (waktuViral !== -1 && waktuRedam === -1) {
+                waktuRedam = h - 1;
+            }
+        }
+    }
 
-        // 2. Hitung Transisi Probabilitas PFA untuk agen ini
-        const tp = computeTransProbs(a, { credibility: effCredibility, fypRate: effFyp, sigma, gamma });
-
-        // 3. Hitung peluang sukses transisi dari rentan (S) hingga menjadi penyebar aktif (I)
-        // Berdasarkan struktur pohon keputusan (Markov chain): 
-        // P(S -> E) = effFyp * believeProb
-        const pS_to_E = effFyp * believeProb;
-
-        // P(E -> B) = tp.pRtB. Namun jika gagal (masuk subState D), dia langsung keluar ke status R.
-        const pE_to_B = tp.pRtB;
-
-        // P(B -> I) = tp.pBtT. Jika masuk ke pBtR (0.1), dia melakukan looping kembali mengamati.
-        // Koreksi penyerapan loop Markov: pB_to_I = tp.pBtT / (1 - tp.pBtR)
-        const pB_to_I = tp.pBtT / (1 - tp.pBtR);
-
-        // Total probabilitas sukses dari terpapar (E) hingga benar-benar ikut memposting/menyebarkan (I)
-        const pE_to_I = pE_to_B * pB_to_I;
-
-        // Kombinasi laju infeksi efektif per kontak agen
-        sumTransmittedPotential += (pS_to_E * pE_to_I);
-    });
-
-    // Rata-rata laju infeksi efektif populasi (effective transmission rate / beta)
-    const avgBetaEff = sumTransmittedPotential / N;
-
-    // Durasi rata-rata agen bertahan di status transmisi aktif 'I' sebelum keluar ke absorbsi 'R' (Final)
-    // Berdasarkan tp.pTtF + tp.pTtR = gamma * 0.7 + gamma * 0.3 = gamma
-    // Maka waktu hidup infeksi (Infectious period) = 1 / gamma
-    const infectiousDuration = 1 / (gamma || 0.01);
-    const effectiveContactRate = muFollower / N;
-
-    // Kalkulasi akhir R0 disesuaikan dengan rata-rata jangkauan penyebaran (muFollower)
-    let R0 = parseFloat((avgBetaEff * effectiveContactRate * infectiousDuration).toFixed(2));
+    // Data engagement terakhir (kumulatif)
+    const finalEngagement = engagementTimeline[engagementTimeline.length - 1];
+    const finalEngagementScore = ViralEngine.calculateEngagementScore(finalEngagement);
 
     return {
-        agents, timeline, R0,
+        agents, timeline,
+        viralResult,
+        engagementTimeline,
+        hourlyEvaluations,
+        finalEngagement,
+        finalEngagementScore,
+        peakVelocity,
+        peakER,
+        waktuViral,
+        waktuRedam,
         params: { effCredibility, effFyp, pMult },
         sampledValues: { credibility, fypRate }
     };
@@ -371,6 +502,6 @@ function runMonteCarlo(config, runs = 5) {
 }
 
 window.SimEngine = {
-    runSimulation, runMonteCarlo, createAgents, countStates,
+    runSimulation, runMonteCarlo, createAgents, countStates, ViralEngine,
     INTELLIGENCE_CATEGORIES, CREDIBILITY_CATEGORIES, FYP_CATEGORIES, ACCOUNT_CATEGORIES
 };

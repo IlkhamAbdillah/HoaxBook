@@ -447,7 +447,7 @@
                         <div class="spr-row"><span>Poster</span><strong id="spr-poster">—</strong></div>
                         <div class="spr-row"><span>Credibility</span><strong id="spr-cred">—</strong></div>
                         <div class="spr-row"><span>FYP rate</span><strong id="spr-fyp">—</strong></div>
-                        <div class="spr-row"><span>R₀ est.</span><strong id="spr-r0">—</strong></div>
+                        <div class="spr-row"><span>Verdict</span><strong id="spr-verdict" style="font-size:10px;max-width:140px;text-align:right;line-height:1.3">—</strong></div>
                     </div>
                 </div>
             </div>
@@ -474,25 +474,30 @@
 
                 <!-- Metric cards -->
                 <div class="result-metrics">
-                    <div class="rm-card">
-                        <div class="rmc-label">Total Terpapar</div>
-                        <div class="rmc-val" id="rm-exposed">—</div>
-                        <div class="rmc-sub">dari total N agen</div>
+                    <div class="rm-card rm-orange">
+                        <div class="rmc-label">⏳ Waktu Mulai Viral</div>
+                        <div class="rmc-val" id="rm-viral-time">—</div>
+                        <div class="rmc-sub">fase penyebaran algoritma</div>
                     </div>
-                    <div class="rm-card rm-red">
-                        <div class="rmc-label">Percaya (Infected)</div>
-                        <div class="rmc-val" id="rm-infected">—</div>
-                        <div class="rmc-sub">menyebarkan hoax</div>
-                    </div>
-                    <div class="rm-card rm-green">
-                        <div class="rmc-label">Tidak Percaya (Removed)</div>
-                        <div class="rmc-val" id="rm-removed">—</div>
-                        <div class="rmc-sub">menghentikan rantai</div>
+                    <div class="rm-card rm-purple">
+                        <div class="rmc-label">📉 Waktu Mulai Redam</div>
+                        <div class="rmc-val" id="rm-redam-time">—</div>
+                        <div class="rmc-sub">momentum interaksi turun</div>
                     </div>
                     <div class="rm-card rm-blue">
-                        <div class="rmc-label">R₀ Efektif</div>
-                        <div class="rmc-val" id="rm-r0">—</div>
-                        <div class="rmc-sub">tipping point = 1.0</div>
+                        <div class="rmc-label">👁️ Total Views</div>
+                        <div class="rmc-val" id="rm-views">—</div>
+                        <div class="rmc-sub">akumulasi impresi total</div>
+                    </div>
+                    <div class="rm-card rm-teal">
+                        <div class="rmc-label">❤️ Total Likes</div>
+                        <div class="rmc-val" id="rm-likes">—</div>
+                        <div class="rmc-sub">respon positif pengguna</div>
+                    </div>
+                    <div class="rm-card rm-red">
+                        <div class="rmc-label">💬 Total Comments</div>
+                        <div class="rmc-val" id="rm-comments">—</div>
+                        <div class="rmc-sub">interaksi aktif pengguna</div>
                     </div>
                 </div>
 
