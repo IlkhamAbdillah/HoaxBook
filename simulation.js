@@ -84,9 +84,9 @@ const ViralEngine = {
     const previousData = currentHour > 1 ? timelineInteractions[currentHour - 2] : { views: 0 };
     const viewVelocity = latestData.views - previousData.views;
 
-    // 3. Hitung Real-time Engagement Rate (ER) berdasarkan proporsi totalInteractions / totalExposed
+    // 3. Hitung Real-time Engagement Rate (ER) berdasarkan proporsi totalInteractions / views
     const totalEngagement = latestData.likes + latestData.comments + latestData.shares;
-    const engagementRate = latestData.exposed > 0 ? (totalEngagement / latestData.exposed) : 0;
+    const engagementRate = latestData.views > 0 ? (totalEngagement / latestData.views) : 0;
 
     // 4. Hitung Skor Akselerasi Algoritma
     const engagementScore = this.calculateEngagementScore(latestData);
@@ -122,7 +122,6 @@ const ViralEngine = {
    */
   generateEngagementTimeline(timeline, agents, config) {
     const N = config.N;
-    const muFollower = config.muFollower;
     const pMult = (ACCOUNT_CATEGORIES[config.posterType]?.mult) || 1.0;
     const interactions = [];
     
@@ -137,20 +136,32 @@ const ViralEngine = {
       const activeInfected = snap.I;
       const exposed = snap.E;
       
+      let totalActiveFollowers = 0;
+      for (const a of agents) {
+          if (a.history && a.history[t] === 'I') {
+              totalActiveFollowers += a.followers;
+          }
+      }
+      
       // Views: setiap penyebar aktif menjangkau rata-rata follower mereka, ditambah efek FYP
-      const newViews = Math.round(activeInfected * muFollower * pMult * (0.3 + Math.random() * 0.4));
+      let newViews = Math.round(totalActiveFollowers * pMult * (0.3 + Math.random() * 0.4));
+
+      // Hitung engagement sebagai persentase realistis dari views, ditambah partisipasi agen dari dalam jaringan simulasi
+      let newLikes = Math.round(newViews * (0.02 + Math.random() * 0.06)) + Math.round(activeInfected * 0.8 + exposed * 0.2);
+      let newComments = Math.round(newViews * (0.005 + Math.random() * 0.015)) + Math.round(activeInfected * 0.3 + exposed * 0.05);
+      let newShares = Math.round(newViews * (0.002 + Math.random() * 0.008)) + Math.round(activeInfected * 0.5);
+
+      // Pastikan total interaksi tidak pernah melebihi views (karena followers agen biasa sangat kecil)
+      const totalNewEngagement = newLikes + newComments + newShares;
+      if (totalNewEngagement > newViews) {
+          // Jika agen di dalam simulasi menghasilkan banyak interaksi tapi followers mereka sedikit, 
+          // paksa naikkan views minimal sedikit lebih besar dari total engagement.
+          newViews = totalNewEngagement + Math.round(totalNewEngagement * (0.1 + Math.random() * 0.3));
+      }
+
       cumulativeViews += newViews;
-
-      // Likes: sebagian kecil dari yang terpapar & percaya
-      const newLikes = Math.round((activeInfected + exposed * 0.3) * (5 + Math.random() * 15) * pMult);
       cumulativeLikes += newLikes;
-
-      // Comments: lebih sedikit dari likes, tapi bobot lebih besar
-      const newComments = Math.round((activeInfected * 0.4 + exposed * 0.1) * (2 + Math.random() * 5) * pMult);
       cumulativeComments += newComments;
-
-      // Shares: hanya agen I yang aktif share
-      const newShares = Math.round(activeInfected * (1 + Math.random() * 3) * pMult);
       cumulativeShares += newShares;
 
       // Total Exposed adalah N - S (seluruh agen yang bukan S lagi)
@@ -356,6 +367,7 @@ function countStates(agents) {
 function runSimulation(config) {
     const {
         N, muFollower, sdFollower,
+        posterMuFollower, posterSdFollower,
         posterType,
         credibilityCategory, fypCategory, intelligenceCategory,
         sigma, gamma, T,
@@ -390,6 +402,8 @@ function runSimulation(config) {
         sorted[k].status = 'I';
         sorted[k].subState = 'T';
         sorted[k].infectedDay = 0;
+        // The poster gets the specific poster connections, not the ordinary agent connections
+        sorted[k].followers = Math.max(0, Math.round(randNorm(posterMuFollower, posterSdFollower)));
     }
 
     // Initialize history
@@ -416,28 +430,27 @@ function runSimulation(config) {
 
     // ── Kalkulasi Engagement & Velocity (ViralEngine) ──
     const engagementTimeline = ViralEngine.generateEngagementTimeline(timeline, agents, config);
-    
-    // Evaluasi viralitas berdasarkan data engagement terakhir
-    const viralResult = ViralEngine.evaluateVirality(
-        { caption: 'sim' }, 
-        engagementTimeline,
-        { velocity: 500, er: config.N * 0.05 }
-    );
 
     // Hitung peak engagement & velocity, serta waktu viral & redam
     let peakVelocity = 0;
     let peakER = 0;
     let waktuViral = -1;
     let waktuRedam = -1;
+    let peakHour = 1;
+
     const hourlyEvaluations = [];
     for (let h = 1; h <= engagementTimeline.length; h++) {
         const evalH = ViralEngine.evaluateVirality(
             { caption: 'sim' },
             engagementTimeline.slice(0, h),
-            { velocity: 500, er: config.N * 0.05 }
+            { velocity: 500, er: 0.05 }
         );
         hourlyEvaluations.push(evalH);
-        if (evalH.viewVelocityPerHour > peakVelocity) peakVelocity = evalH.viewVelocityPerHour;
+        
+        if (evalH.viewVelocityPerHour > peakVelocity) {
+            peakVelocity = evalH.viewVelocityPerHour;
+            peakHour = h;
+        }
         if (evalH.engagementRateRaw > peakER) peakER = evalH.engagementRateRaw;
         
         // Track waktu viral dan redam
@@ -450,6 +463,13 @@ function runSimulation(config) {
             }
         }
     }
+
+    // Evaluasi viralitas secara keseluruhan (berdasarkan performa puncak, bukan saat simulasi sudah padam)
+    const viralResult = ViralEngine.evaluateVirality(
+        { caption: 'sim' }, 
+        engagementTimeline.slice(0, peakHour),
+        { velocity: 500, er: 0.05 }
+    );
 
     // Data engagement terakhir (kumulatif)
     const finalEngagement = engagementTimeline[engagementTimeline.length - 1];

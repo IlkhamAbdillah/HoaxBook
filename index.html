@@ -223,38 +223,20 @@
                             </select>
                         </div>
                         <div class="pg-item">
+                            <label>Platform</label>
+                            <select id="pPlatform">
+                                <option value="facebook">Facebook</option>
+                                <option value="instagram">Instagram</option>
+                                <option value="tiktok">TikTok</option>
+                            </select>
+                        </div>
+                        <div class="pg-item" style="grid-column: span 2;">
                             <label>Credibility</label>
                             <select id="pCredCat">
                                 <option value="trustworthy">Dapat Dipercaya</option>
                                 <option value="untrustworthy">Tidak Dapat Dipercaya</option>
                             </select>
                             <div class="hint-text">Makin tinggi → hoax makin mudah dipercaya</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="param-section">
-                    <div class="psec-label">👥 Distribusi Follower Poster</div>
-                    <div class="param-grid">
-                        <div class="pg-item">
-                            <label>μ Follower (rata-rata)</label>
-                            <div class="slider-wrap">
-                                <input type="range" id="pMu" min="50" max="100000" value="1000" step="50"
-                                    oninput="document.getElementById('pMuVal').value=this.value">
-                                <input type="number" id="pMuVal" class="num-input"
-                                    style="width:70px; padding:4px; font-size:11px;" value="1000" min="50" max="100000"
-                                    oninput="document.getElementById('pMu').value=this.value">
-                            </div>
-                        </div>
-                        <div class="pg-item">
-                            <label>σ Follower (dispersi)</label>
-                            <div class="slider-wrap">
-                                <input type="range" id="pSigma" min="10" max="50000" value="500" step="50"
-                                    oninput="document.getElementById('pSigmaVal').value=this.value">
-                                <input type="number" id="pSigmaVal" class="num-input"
-                                    style="width:70px; padding:4px; font-size:11px;" value="500" min="10" max="50000"
-                                    oninput="document.getElementById('pSigma').value=this.value">
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -474,16 +456,6 @@
 
                 <!-- Metric cards -->
                 <div class="result-metrics">
-                    <div class="rm-card rm-orange">
-                        <div class="rmc-label">⏳ Waktu Mulai Viral</div>
-                        <div class="rmc-val" id="rm-viral-time">—</div>
-                        <div class="rmc-sub">fase penyebaran algoritma</div>
-                    </div>
-                    <div class="rm-card rm-purple">
-                        <div class="rmc-label">📉 Waktu Mulai Redam</div>
-                        <div class="rmc-val" id="rm-redam-time">—</div>
-                        <div class="rmc-sub">momentum interaksi turun</div>
-                    </div>
                     <div class="rm-card rm-blue">
                         <div class="rmc-label">👁️ Total Views</div>
                         <div class="rmc-val" id="rm-views">—</div>
@@ -498,6 +470,11 @@
                         <div class="rmc-label">💬 Total Comments</div>
                         <div class="rmc-val" id="rm-comments">—</div>
                         <div class="rmc-sub">interaksi aktif pengguna</div>
+                    </div>
+                    <div class="rm-card rm-green" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #10b981;">
+                        <div class="rmc-label" style="color: #059669; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">🔄 Total Shares</div>
+                        <div class="rmc-val" id="rm-shares" style="font-size: 24px; font-weight: 700; margin: 4px 0;">—</div>
+                        <div class="rmc-sub" style="font-size: 10px; opacity: 0.8;">jangkauan jaringan baru</div>
                     </div>
                 </div>
 

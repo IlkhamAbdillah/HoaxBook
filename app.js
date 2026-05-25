@@ -14,12 +14,21 @@ const SIM_DAYS = 40;
 // ── Application State ──────────────────────────────────────
 let params = {
     posterType: 'ordinary',
+    platform: 'facebook',
     credibilityCategory: 'trustworthy',
-    muFollower: 1000, sdFollower: 500,
+    posterMuFollower: 30, posterSdFollower: 6,
+    muFollower: 30, sdFollower: 6,
     fypCategory: 'fyp',
     intelligenceCategory: 'bodoh',
     N: 120, sigma: 0.45, gamma: 0.12,
     duration: 30,
+};
+
+const FOLLOWER_MAP = {
+    influencer: { facebook: 500, instagram: 10000, tiktok: 50000 },
+    creator: { facebook: 200, instagram: 1500, tiktok: 20000 },
+    media: { facebook: 100, instagram: 1000, tiktok: 10000 },
+    ordinary: { facebook: 30, instagram: 200, tiktok: 500 }
 };
 
 let lastResult = null;
@@ -53,12 +62,23 @@ function saveParams() {
     const cCat = $('pCredCat').value;
     const fCat = $('pFypCat').value;
     const iCat = $('pIntCat').value;
+    const pType = $('pPosterType').value;
+    const pPlat = $('pPlatform').value;
+    
+    const posterMu = FOLLOWER_MAP[pType][pPlat];
+    const posterSd = Math.round(posterMu * 0.2);
+
+    const agentMu = FOLLOWER_MAP['ordinary'][pPlat];
+    const agentSd = Math.round(agentMu * 0.2);
 
     params = {
-        posterType: $('pPosterType').value,
+        posterType: pType,
+        platform: pPlat,
         credibilityCategory: cCat,
-        muFollower: parseInt($('pMu').value),
-        sdFollower: parseInt($('pSigma').value),
+        posterMuFollower: posterMu,
+        posterSdFollower: posterSd,
+        muFollower: agentMu,
+        sdFollower: agentSd,
         fypCategory: fCat,
         intelligenceCategory: iCat,
         N: parseInt($('pN').value),
@@ -72,7 +92,7 @@ function saveParams() {
 
 function updateParamSummary() {
     $('ps-poster').textContent = SimEngine.ACCOUNT_CATEGORIES[params.posterType]?.label || '—';
-    $('ps-mu').textContent = fmt(params.muFollower);
+    $('ps-mu').textContent = params.platform.charAt(0).toUpperCase() + params.platform.slice(1) + ' (' + fmt(params.posterMuFollower) + ')';
     $('ps-fyp').textContent = SimEngine.FYP_CATEGORIES[params.fypCategory]?.label || '—';
     $('ps-cred').textContent = SimEngine.CREDIBILITY_CATEGORIES[params.credibilityCategory]?.label || '—';
     $('ps-n').textContent = params.N;
@@ -131,6 +151,8 @@ async function runAnimatedSimulation() {
         N: params.N,
         muFollower: params.muFollower,
         sdFollower: params.sdFollower,
+        posterMuFollower: params.posterMuFollower,
+        posterSdFollower: params.posterSdFollower,
         posterType: params.posterType,
         credibilityCategory: params.credibilityCategory,
         fypCategory: params.fypCategory,
@@ -399,16 +421,20 @@ function showResults(result, config) {
     $('verdictBanner').className = 'verdict-banner ' + verdictClass;
     $('vbIcon').textContent = verdictIcon;
     $('vbTitle').textContent = viralResult.verdict;
-    $('vbDesc').textContent = isV
-        ? `Velocity ${fmt(viralResult.viewVelocityPerHour)} views/jam dengan Engagement Rate ${viralResult.engagementRate}. Total ${fmt(totExp)} dari ${fmt(N)} agen (${pct(totExp, N)}) terpapar hoax.`
-        : `Velocity ${fmt(viralResult.viewVelocityPerHour)} views/jam, Engagement Rate ${viralResult.engagementRate}. Penyebaran tidak memenuhi ambang viralitas — hanya ${fmt(totExp)} dari ${fmt(N)} agen (${pct(totExp, N)}) terpapar.`;
+    
+    let timeStatusInfo = ``;
+    if (waktuViral !== -1) timeStatusInfo += ` • Mulai Viral: Hari ke-${waktuViral}`;
+    if (waktuRedam !== -1) timeStatusInfo += ` • Mulai Redam: Hari ke-${waktuRedam}`;
+
+    $('vbDesc').innerHTML = isV
+        ? `Velocity ${fmt(viralResult.viewVelocityPerHour)} views/jam dengan Engagement Rate ${viralResult.engagementRate}. Total ${fmt(totExp)} dari ${fmt(N)} agen (${pct(totExp, N)}) terpapar hoax.<br><span style="display:inline-block; margin-top:4px; font-weight:600;">Status Akhir: ${timeStatusInfo.substring(3) || '—'}</span>`
+        : `Velocity ${fmt(viralResult.viewVelocityPerHour)} views/jam, Engagement Rate ${viralResult.engagementRate}. Penyebaran tidak memenuhi ambang viralitas — hanya ${fmt(totExp)} dari ${fmt(N)} agen (${pct(totExp, N)}) terpapar.<br><span style="display:inline-block; margin-top:4px; font-weight:600;">Status Akhir: Padam</span>`;
 
     // ── Metric cards ──
-    $('rm-viral-time').textContent = waktuViral !== -1 ? `Hari ke-${waktuViral}` : '—';
-    $('rm-redam-time').textContent = waktuRedam !== -1 ? `Hari ke-${waktuRedam}` : '—';
     $('rm-views').textContent = fmt(finalEngagement.views);
     $('rm-likes').textContent = fmt(finalEngagement.likes);
     $('rm-comments').textContent = fmt(finalEngagement.comments);
+    $('rm-shares').textContent = fmt(finalEngagement.shares);
 
     // ── Insight ──
     $('insightBox').innerHTML = `
@@ -519,14 +545,18 @@ function drawResultDist(agents) {
 
     const g = svg.append('g').attr('transform', `translate(${m.l},${m.t})`);
     const bins = 12;
-    const maxF = Math.max(...agents.map(a => a.followers), 1);
+    // Gunakan max follower dari agen biasa (bukan poster awal yang infectedDay = 0) untuk skala
+    const ordinaryAgents = agents.filter(a => a.infectedDay !== 0);
+    const agentsForScale = ordinaryAgents.length > 0 ? ordinaryAgents : agents;
+    const maxF = Math.max(...agentsForScale.map(a => a.followers), 1);
     const bSz = Math.ceil(maxF / bins) || 1;
 
     const binData = Array.from({ length: bins }, (_, i) => {
-        const lo = i * bSz, hi = lo + bSz;
+        const lo = i * bSz;
+        const hi = (i === bins - 1) ? Infinity : lo + bSz; // Bin terakhir menangkap semua outlier (termasuk poster)
         const ib = agents.filter(a => a.followers >= lo && a.followers < hi);
         return {
-            x0: lo, x1: hi,
+            x0: lo, x1: (i === bins - 1) ? lo + bSz : hi,
             S: ib.filter(a => a.status === 'S').length,
             E: ib.filter(a => a.status === 'E').length,
             I: ib.filter(a => a.status === 'I').length,
