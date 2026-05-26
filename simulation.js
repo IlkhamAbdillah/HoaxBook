@@ -20,9 +20,9 @@
 
 // ── Category Configurations ──────────────────────────
 const INTELLIGENCE_CATEGORIES = {
-    bodoh: { mu: 87.5, sigma: 4.17, min: 75, max: 100, label: 'Bodoh' },
-    fomo: { mu: 50, sigma: 8.33, min: 25, max: 75, label: 'FOMO' },
-    pintar: { mu: 12.5, sigma: 4.17, min: 0, max: 25, label: 'Pintar' },
+    bodoh: { mu: 87.5, sigma: 4.17, min: 75, max: 100, label: 'Tidak Cerdas' },
+    fomo: { mu: 50, sigma: 8.33, min: 25, max: 75, label: 'Fomo' },
+    pintar: { mu: 12.5, sigma: 4.17, min: 0, max: 25, label: 'Cerdas' },
 };
 
 
@@ -69,9 +69,9 @@ const ViralEngine = {
    * @param {Array} timelineInteractions - Riwayat interaksi tiap jam [{likes, comments, shares, views}]
    * @param {Object} threshold - Batas minimum penentu (Benchmark platform)
    */
-  evaluateVirality(post, timelineInteractions, threshold = { velocity: 500, er: 0.05 }) {
+  evaluateVirality(post, timelineInteractions, threshold = { velocity: 500, er: 0.05 }, wasViralBefore = false) {
     const currentHour = timelineInteractions.length;
-    if (currentHour === 0) return { isViral: false, status: 'Draft/Baru' };
+    if (currentHour === 0) return { isViral: false, status: 'Draft/Baru', verdict: 'TIDAK VIRAL' };
 
     // 1. Ambil data jam terakhir
     const latestData = timelineInteractions[currentHour - 1];
@@ -88,17 +88,20 @@ const ViralEngine = {
     const engagementScore = this.calculateEngagementScore(latestData);
 
     // 5. Penentuan Status Viralitas
-    const meetsVelocity = viewVelocity >= threshold.velocity;
-    const meetsEngagement = engagementRate >= threshold.er;
-    const isViral = meetsVelocity && meetsEngagement;
+    // BUG FIX: Day 0 (currentHour === 1) tidak boleh langsung viral karena itu hanya initial broadcast
+    let isViral = false;
+    if (currentHour > 1) {
+        const meetsVelocity = viewVelocity >= threshold.velocity;
+        const meetsEngagement = engagementRate >= threshold.er;
+        isViral = meetsVelocity && meetsEngagement;
+    }
 
-    let verdict = 'Stagnan';
+    let verdict = 'TIDAK VIRAL';
     if (isViral) {
-      verdict = '🔥 VIRAL (Akselerasi Algoritma)';
-    } else if (meetsVelocity && !meetsEngagement) {
-      verdict = '📈 Impresi Tinggi tapi Menguap (Kurang Interaksi / Clickbait)';
-    } else if (!meetsVelocity && meetsEngagement) {
-      verdict = '💎 Berkualitas tapi Kurang Dorongan Algoritma (Cluster Kecil)';
+      verdict = '🔥 VIRAL';
+    } 
+    else if (wasViralBefore) {
+      verdict = '💎 PADAM';
     }
 
     return {
@@ -422,15 +425,21 @@ function runSimulation(config) {
     let waktuViral = -1;
     let waktuRedam = -1;
     let peakHour = 1;
+    let hasBeenViral = false;
 
     const hourlyEvaluations = [];
     for (let h = 1; h <= engagementTimeline.length; h++) {
         const evalH = ViralEngine.evaluateVirality(
             { caption: 'sim' },
             engagementTimeline.slice(0, h),
-            { velocity: 500, er: 0.05 }
+            { velocity: 500, er: 0.05 },
+            hasBeenViral
         );
         hourlyEvaluations.push(evalH);
+        
+        if (evalH.isViral) {
+            hasBeenViral = true;
+        }
         
         if (evalH.viewVelocityPerHour > peakVelocity) {
             peakVelocity = evalH.viewVelocityPerHour;

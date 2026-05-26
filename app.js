@@ -89,8 +89,9 @@ function saveParams() {
 
 function updateParamSummary() {
     $('ps-poster').textContent = SimEngine.ACCOUNT_CATEGORIES[params.posterType]?.label || '—';
-    $('ps-mu').textContent = params.platform.charAt(0).toUpperCase() + params.platform.slice(1) + ' (' + fmt(params.posterMuFollower) + ')';
+    $('ps-platform').textContent = params.platform.charAt(0).toUpperCase() + params.platform.slice(1);
     $('ps-fyp').textContent = SimEngine.FYP_CATEGORIES[params.fypCategory]?.label || '—';
+    $('ps-int').textContent = SimEngine.INTELLIGENCE_CATEGORIES[params.intelligenceCategory]?.label || '—';
     $('ps-n').textContent = params.N;
 }
 
@@ -175,8 +176,11 @@ async function runAnimatedSimulation() {
     openModal('simModal');
     $('liveStatsCard').style.display = 'block';
 
-    // Params recap — show engagement metrics instead of R0
+    // Params recap
+    const posterAgent = result.agents.find(a => a.infectedDay === 0);
     $('spr-poster').textContent = SimEngine.ACCOUNT_CATEGORIES[config.posterType]?.label || '—';
+    $('spr-platform').textContent = params.platform.charAt(0).toUpperCase() + params.platform.slice(1);
+    $('spr-conn').textContent = fmt(posterAgent ? posterAgent.followers : config.posterMuFollower);
     $('spr-fyp').textContent = (result.sampledValues.fypRate * 100).toFixed(0) + '%';
     $('spr-verdict').textContent = '⏳ Menghitung...';
 
@@ -400,29 +404,30 @@ function showResults(result, config) {
     const belCnt = agents.filter(a => a.believed).length;
 
     // ── Verdict banner ──
-    let verdictClass = 'verdict-safe';
+    let verdictClass = 'verdict-tidak-viral';
     let verdictIcon = '🛡️';
-    if (viralResult.isViral) {
+    let verdictTitle = 'TIDAK VIRAL';
+    let verdictDesc = '';
+
+    if (waktuViral !== -1) {
         verdictClass = 'verdict-viral';
         verdictIcon = '🔥';
-    } else if (viralResult.verdict.includes('Impresi Tinggi')) {
-        verdictClass = 'verdict-clickbait';
-        verdictIcon = '📈';
-    } else if (viralResult.verdict.includes('Berkualitas')) {
-        verdictClass = 'verdict-niche';
-        verdictIcon = '💎';
+        verdictTitle = 'VIRAL';
+        
+        if (waktuRedam !== -1) {
+            verdictDesc = `<b>Mulai Viral: Hari ke-${waktuViral}</b><br><b>Mulai Padam: Hari ke-${waktuRedam}</b>`;
+        } else {
+            verdictDesc = `<b>Mulai Viral: Hari ke-${waktuViral}</b>`;
+        }
+    } else {
+        verdictTitle = 'TIDAK VIRAL';
+        verdictDesc = '';
     }
+
     $('verdictBanner').className = 'verdict-banner ' + verdictClass;
     $('vbIcon').textContent = verdictIcon;
-    $('vbTitle').textContent = viralResult.verdict;
-    
-    let timeStatusInfo = ``;
-    if (waktuViral !== -1) timeStatusInfo += ` • Mulai Viral: Hari ke-${waktuViral}`;
-    if (waktuRedam !== -1) timeStatusInfo += ` • Mulai Redam: Hari ke-${waktuRedam}`;
-
-    $('vbDesc').innerHTML = isV
-        ? `Velocity ${fmt(viralResult.viewVelocityPerHour)} views/jam dengan Engagement Rate ${viralResult.engagementRate}. Total ${fmt(totExp)} dari ${fmt(N)} agen (${pct(totExp, N)}) terpapar hoax.<br><span style="display:inline-block; margin-top:4px; font-weight:600;">Status Akhir: ${timeStatusInfo.substring(3) || '—'}</span>`
-        : `Velocity ${fmt(viralResult.viewVelocityPerHour)} views/jam, Engagement Rate ${viralResult.engagementRate}. Penyebaran tidak memenuhi ambang viralitas — hanya ${fmt(totExp)} dari ${fmt(N)} agen (${pct(totExp, N)}) terpapar.<br><span style="display:inline-block; margin-top:4px; font-weight:600;">Status Akhir: Padam</span>`;
+    $('vbTitle').textContent = verdictTitle;
+    $('vbDesc').innerHTML = verdictDesc;
 
     // ── Metric cards ──
     $('rm-views').textContent = fmt(finalEngagement.views);
@@ -609,7 +614,6 @@ function populateAgentTable(agents) {
       <td>${fmt(a.followers)}</td>
       <td><span class="st-badge st-${a.status}">${a.status} — ${LABEL[a.status]}</span></td>
       <td>${a.infectedDay >= 0 ? 'Hari ' + a.infectedDay : '—'}</td>
-      <td>${a.contacts}</td>
     </tr>`).join('');
 }
 
@@ -629,10 +633,16 @@ function createFeedCard(result, config) {
     const tStr = now.toLocaleTimeString('id', { hour: '2-digit', minute: '2-digit' });
 
     // Short verdict for badge
-    let badgeText = '🛡️ PADAM';
-    if (viralResult.isViral) badgeText = '🔥 VIRAL';
-    else if (viralResult.verdict.includes('Impresi Tinggi')) badgeText = '📈 CLICKBAIT';
-    else if (viralResult.verdict.includes('Berkualitas')) badgeText = '💎 NICHE';
+    let badgeText = '🛡️ TIDAK VIRAL';
+    if (result.waktuViral !== -1) {
+        if (result.waktuRedam !== -1) {
+            let daysViral = result.waktuRedam - result.waktuViral;
+            badgeText = `🔥 VIRAL (${daysViral} hari) - PADAM`;
+        } else {
+            let daysViral = T - result.waktuViral;
+            badgeText = `🔥 VIRAL (${daysViral} hari)`;
+        }
+    }
 
     const card = document.createElement('div');
     card.className = 'post-card';
@@ -648,7 +658,7 @@ function createFeedCard(result, config) {
     ${lastPostData?.imageData
             ? `<img class="pc-img" src="${lastPostData.imageData}" alt="Post image">`
             : ''}
-    <div class="hoax-badge">${badgeText} — ER: ${viralResult.engagementRate}</div>
+    <div class="hoax-badge">${badgeText} </div> 
     <div class="pc-stats">
       <div class="pc-reactions">
         <span>😡</span><span>😮</span><span>👍</span>
@@ -683,15 +693,47 @@ function resetSim() {
 /* ═══════════════════════════════════════════════════════════
    EVENT LISTENERS — wired on DOMContentLoaded
    ═══════════════════════════════════════════════════════════ */
+function syncInput(rangeId, numId, defaultVal) {
+    const range = $(rangeId);
+    const num = $(numId);
+    
+    range.addEventListener('input', () => {
+        num.value = range.value;
+    });
+
+    num.addEventListener('input', () => {
+        let val = parseFloat(num.value);
+        if (!isNaN(val) && val >= parseFloat(range.min) && val <= parseFloat(range.max)) {
+            range.value = val;
+        }
+    });
+
+    num.addEventListener('change', () => {
+        let val = parseFloat(num.value);
+        if (isNaN(val)) {
+            num.value = defaultVal;
+        } else if (val > parseFloat(range.max)) {
+            num.value = range.max;
+        } else if (val < parseFloat(range.min)) {
+            num.value = range.min;
+        }
+        range.value = num.value;
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     setupImageUpload();
     updateParamSummary();
+
+    syncInput('pN', 'pNVal', 120);
+    syncInput('pSigmaEI', 'pSigmaEIVal', 0.45);
+    syncInput('pGamma', 'pGammaVal', 0.12);
+    syncInput('pDuration', 'pDurVal', 30);
 
     // ── Open params modal ──
     const openP = () => openModal('paramsModal');
     $('openParamsBtn').addEventListener('click', openP);
     $('openParamsBtn2').addEventListener('click', openP);
-    $('btnParams').addEventListener('click', openP);
 
     // ── Open post modal ──
     const openPost = () => openModal('postModal');
