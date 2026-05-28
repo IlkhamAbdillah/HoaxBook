@@ -9,7 +9,7 @@
 const COLORS = { S: '#ffffff', E: '#9ca3af', I: '#ef4444', R: '#3b82f6' };
 const LABEL = { S: 'Susceptible', E: 'Exposed', I: 'Percaya', R: 'Tidak Percaya' };
 const POSTER_L = { ordinary: 'Orang Biasa', creator: 'Content Creator', media: 'Media', influencer: 'Influencer' };
-const SIM_DAYS = 40;
+let SIM_DAYS = 40;
 
 // ── Application State ──────────────────────────────────────
 let params = {
@@ -19,8 +19,10 @@ let params = {
     muFollower: 30, sdFollower: 6,
     fypCategory: 'fyp',
     intelligenceCategory: 'bodoh',
-    N: 120, sigma: 0.45, gamma: 0.12,
-    duration: 30,
+    N: 150, sigma: 0.25, gamma: 0.67,
+    duration: 15,
+    simDays: 40,
+    runs: 5,
 };
 
 const FOLLOWER_MAP = {
@@ -82,7 +84,10 @@ function saveParams() {
         sigma: parseFloat($('pSigmaEI').value),
         gamma: parseFloat($('pGamma').value),
         duration: parseInt($('pDuration').value),
+        simDays: parseInt($('pSimDays').value),
+        runs: parseInt($('pRuns').value),
     };
+    SIM_DAYS = params.simDays;
     updateParamSummary();
     closeModal('paramsModal');
 }
@@ -93,6 +98,10 @@ function updateParamSummary() {
     $('ps-fyp').textContent = SimEngine.FYP_CATEGORIES[params.fypCategory]?.label || '—';
     $('ps-int').textContent = SimEngine.INTELLIGENCE_CATEGORIES[params.intelligenceCategory]?.label || '—';
     $('ps-n').textContent = params.N;
+    $('ps-duration').textContent = params.duration + ' detik';
+    $('ps-simdays').textContent = params.simDays + ' hari';
+    $('ps-runs').textContent = params.runs + ' kali';
+
 }
 
 // ── Image Upload ───────────────────────────────────────────
@@ -155,13 +164,23 @@ async function runAnimatedSimulation() {
         intelligenceCategory: params.intelligenceCategory,
         sigma: params.sigma,
         gamma: params.gamma,
-        T: SIM_DAYS,
+        T: params.simDays,
         I0: 1,
     };
 
-    // ── Run simulation (computed instantly) ──
-    const result = SimEngine.runSimulation(config);
+    // ── Run Monte Carlo simulation ──
+    const mcResult = SimEngine.runMonteCarlo(config, params.runs);
+    const result = mcResult.lastResult;
     lastResult = result;
+
+    // Build averaged timeline for result charts
+    const avgTimeline = Array.from({ length: config.T + 1 }, (_, t) => ({
+        S: mcResult.avg.S[t] ?? result.timeline[t]?.S ?? 0,
+        E: mcResult.avg.E[t] ?? result.timeline[t]?.E ?? 0,
+        I: mcResult.avg.I[t] ?? result.timeline[t]?.I ?? 0,
+        R: mcResult.avg.R[t] ?? result.timeline[t]?.R ?? 0,
+    }));
+    result._avgTimeline = avgTimeline;
 
     // Sort agents by infectedDay (earliest first, never-infected last)
     const sorted = [...result.agents].sort((a, b) => {
@@ -182,7 +201,7 @@ async function runAnimatedSimulation() {
     $('spr-platform').textContent = params.platform.charAt(0).toUpperCase() + params.platform.slice(1);
     $('spr-conn').textContent = fmt(posterAgent ? posterAgent.followers : config.posterMuFollower);
     $('spr-fyp').textContent = (result.sampledValues.fypRate * 100).toFixed(0) + '%';
-    $('spr-verdict').textContent = '⏳ Menghitung...';
+    $('spr-verdict').textContent = 'Menghitung...';
 
     // Wait for modal to render, then init network
     await sleep(120);
@@ -247,7 +266,7 @@ async function runAnimatedSimulation() {
 
     await sleep(900);
     closeModal('simModal');
-    showResults(result, config);
+    showResults(result, config, result._avgTimeline);
 }
 
 
@@ -392,8 +411,9 @@ function drawMiniChart(timeline, tNow) {
 /* ═══════════════════════════════════════════════════════════
    SHOW RESULTS — opens result modal, draws charts
    ═══════════════════════════════════════════════════════════ */
-function showResults(result, config) {
+function showResults(result, config, avgTimeline) {
     const { agents, timeline, viralResult, finalEngagement, finalEngagementScore, peakVelocity, peakER, waktuViral, waktuRedam } = result;
+    const chartTimeline = avgTimeline || timeline;
     const T = timeline.length - 1;
     const N = config.N;
     const fin = timeline[T];
@@ -455,7 +475,7 @@ function showResults(result, config) {
     // ── Open modal, then draw charts ──
     openModal('resultModal');
     requestAnimationFrame(() => setTimeout(() => {
-        drawResultSEIR(timeline);
+        drawResultSEIR(chartTimeline);
         drawResultDist(agents);
     }, 60));
 
@@ -633,14 +653,18 @@ function createFeedCard(result, config) {
     const tStr = now.toLocaleTimeString('id', { hour: '2-digit', minute: '2-digit' });
 
     // Short verdict for badge
-    let badgeText = '🛡️ TIDAK VIRAL';
+    let badgeText = 'TIDAK VIRAL';
+    let badgeClass = 'hoax-badge-tidak-viral';
+
     if (result.waktuViral !== -1) {
+        badgeClass = 'hoax-badge-viral';
+
         if (result.waktuRedam !== -1) {
             let daysViral = result.waktuRedam - result.waktuViral;
-            badgeText = `🔥 VIRAL (${daysViral} hari) - PADAM`;
+            badgeText = `VIRAL (${daysViral} hari)`;
         } else {
             let daysViral = T - result.waktuViral;
-            badgeText = `🔥 VIRAL (${daysViral} hari)`;
+            badgeText = `MASIH VIRAL SETELAH ${params.simDays} HARI`;
         }
     }
 
@@ -648,9 +672,9 @@ function createFeedCard(result, config) {
     card.className = 'post-card';
     card.innerHTML = `
     <div class="pc-header">
-      <div class="pc-ava" style="background:var(--fb-blue)">S</div>
+      <div class="pc-ava" style="padding:0;overflow:hidden;"><img src="doksli/Kucingku.jpg" alt="Simulator User" style="width:100%;height:100%;object-fit:cover;object-position:center;border-radius:50%;"></div>
       <div class="pc-info">
-        <div class="pc-poster">Simulator User</div>
+        <div class="pc-poster">Ilham Jr.</div>
         <div class="pc-poster-sub">${tStr} · 🌐 Publik</div>
       </div>
     </div>
@@ -658,17 +682,13 @@ function createFeedCard(result, config) {
     ${lastPostData?.imageData
             ? `<img class="pc-img" src="${lastPostData.imageData}" alt="Post image">`
             : ''}
-    <div class="hoax-badge">${badgeText} </div> 
+    <div class="hoax-badge ${badgeClass}">${badgeText}</div>
     <div class="pc-stats">
       <div class="pc-reactions">
         <span>😡</span><span>😮</span><span>👍</span>
-        <span style="margin-left:4px">${fmt(finalEngagement.views)} views</span>
+        <span style="margin-left:4px">${fmt(finalEngagement.likes)} likes</span>
       </div>
-      <span>${fmt(finalEngagement.likes)} likes · ${fmt(finalEngagement.shares)} shares</span>
-    </div>
-    <div class="pc-actions">
-      <button class="pca-btn" onclick="openModal('resultModal')">📊 Lihat Detail</button>
-      <button class="pca-btn" onclick="resetSim()">🔄 Simulasi Baru</button>
+      <span>${fmt(finalEngagement.comments)} comments · ${fmt(finalEngagement.shares)} shares</span>
     </div>`;
     feed.prepend(card);
 }
@@ -725,10 +745,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setupImageUpload();
     updateParamSummary();
 
-    syncInput('pN', 'pNVal', 120);
-    syncInput('pSigmaEI', 'pSigmaEIVal', 0.45);
-    syncInput('pGamma', 'pGammaVal', 0.12);
-    syncInput('pDuration', 'pDurVal', 30);
+    syncInput('pN', 'pNVal', 150);
+    syncInput('pSigmaEI', 'pSigmaEIVal', 0.25);
+    syncInput('pGamma', 'pGammaVal', 0.67);
+    syncInput('pDuration', 'pDurVal', 15);
+    syncInput('pSimDays', 'pSimDaysVal', 40);
+    syncInput('pRuns', 'pRunsVal', 5);
 
     // ── Open params modal ──
     const openP = () => openModal('paramsModal');

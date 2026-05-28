@@ -1,30 +1,19 @@
-/* simulation.js — ABM-SEIR Engine
- * Berdasarkan: Maximov & Shvetcov (IEEE Inforino 2024)
- * Model: Probabilistic Finite Automaton per agen
- *
- * Status agen (dari paper):
- *   R  → menerima (Susceptible/Exposed)
- *   B  → percaya (Believes) — akan menyebarkan
- *   D  → tidak percaya (Distrust)
- *   T  → transmitting / Infectious
- *   F  → final (Removed)
- *
- * Mapping ke SEIR:
- *   S = belum terpapar
- *   E = R (menerima, belum memutuskan)
- *   I = B+T (percaya & menyebarkan)
- *   R_out = D+F (tidak percaya / berhenti)
- */
-
 'use strict';
 
-// ── Category Configurations ──────────────────────────
+function randNorm(mu, sd) {
+    const u1 = Math.random(), u2 = Math.random();
+    return mu + sd * Math.sqrt(-2 * Math.log(u1 || 1e-10)) * Math.cos(2 * Math.PI * u2);
+}
+
+function randNormClamped(mu, sd, min, max) {
+    return Math.max(min, Math.min(max, randNorm(mu, sd)));
+}
+
 const INTELLIGENCE_CATEGORIES = {
     bodoh: { mu: 87.5, sigma: 4.17, min: 75, max: 100, label: 'Tidak Cerdas' },
     fomo: { mu: 50, sigma: 8.33, min: 25, max: 75, label: 'Fomo' },
     pintar: { mu: 12.5, sigma: 4.17, min: 0, max: 25, label: 'Cerdas' },
 };
-
 
 const FYP_CATEGORIES = {
     fyp: { mu: 0.75, sigma: 0.083, min: 0.5, max: 1.0, label: 'FYP' },
@@ -38,24 +27,15 @@ const ACCOUNT_CATEGORIES = {
     influencer: { mult: 3.0, label: 'Influencer' },
 };
 
-// Fixed trust threshold — categories control the distribution of trust scores
 const TRUST_THRESHOLD = 50;
 
-/* ═══════════════════════════════════════════════════════════
-   ViralEngine — Engagement & Velocity Based Detection
-   ═══════════════════════════════════════════════════════════ */
-
 const ViralEngine = {
-  // Konfigurasi Bobot Algoritma Rekomendasi Platform
   WEIGHTS: {
     like: 1.0,
-    comment: 2.5,   // Komentar diberi bobot lebih tinggi karena memicu interaksi
-    share: 4.0      // Share paling tinggi karena memperluas jangkauan jaringan
+    comment: 2.5,
+    share: 4.0
   },
 
-  /**
-   * Menghitung skor interaksi berdasarkan aksi pengguna
-   */
   calculateEngagementScore(actions) {
     const { likes, comments, shares } = actions;
     return (likes * this.WEIGHTS.like) + 
@@ -63,32 +43,18 @@ const ViralEngine = {
            (shares * this.WEIGHTS.share);
   },
 
-  /**
-   * Simulasi evaluasi konten oleh algoritma setiap jamnya
-   * @param {Object} post - Data postingan saat ini
-   * @param {Array} timelineInteractions - Riwayat interaksi tiap jam [{likes, comments, shares, views}]
-   * @param {Object} threshold - Batas minimum penentu (Benchmark platform)
-   */
   evaluateVirality(post, timelineInteractions, threshold = { velocity: 500, er: 0.05 }, wasViralBefore = false) {
     const currentHour = timelineInteractions.length;
     if (currentHour === 0) return { isViral: false, status: 'Draft/Baru', verdict: 'TIDAK VIRAL' };
 
-    // 1. Ambil data jam terakhir
     const latestData = timelineInteractions[currentHour - 1];
-    
-    // 2. Hitung Velocity (Laju Pertumbuhan Impresi per Jam)
     const previousData = currentHour > 1 ? timelineInteractions[currentHour - 2] : { views: 0 };
     const viewVelocity = latestData.views - previousData.views;
-
-    // 3. Hitung Real-time Engagement Rate (ER) berdasarkan proporsi totalInteractions / views
     const totalEngagement = latestData.likes + latestData.comments + latestData.shares;
     const engagementRate = latestData.views > 0 ? (totalEngagement / latestData.views) : 0;
 
-    // 4. Hitung Skor Akselerasi Algoritma
     const engagementScore = this.calculateEngagementScore(latestData);
-
-    // 5. Penentuan Status Viralitas
-    // BUG FIX: Day 0 (currentHour === 1) tidak boleh langsung viral karena itu hanya initial broadcast
+    
     let isViral = false;
     if (currentHour > 1) {
         const meetsVelocity = viewVelocity >= threshold.velocity;
@@ -115,10 +81,6 @@ const ViralEngine = {
     };
   },
 
-  /**
-   * Generate simulated engagement data dari hasil ABM-SEIR
-   * Mengkonversi timeline SEIR menjadi data interaksi platform
-   */
   generateEngagementTimeline(timeline, agents, config) {
     const N = config.N;
     const pMult = (ACCOUNT_CATEGORIES[config.posterType]?.mult) || 1.0;
@@ -131,7 +93,6 @@ const ViralEngine = {
 
     for (let t = 0; t < timeline.length; t++) {
       const snap = timeline[t];
-      // Agen yang Infected (I) aktif menyebarkan → mereka generate views dari follower mereka
       const activeInfected = snap.I;
       const exposed = snap.E;
       
@@ -142,19 +103,14 @@ const ViralEngine = {
           }
       }
       
-      // Views: setiap penyebar aktif menjangkau rata-rata follower mereka, ditambah efek FYP
       let newViews = Math.round(totalActiveFollowers * pMult * (0.3 + Math.random() * 0.4));
-
-      // Hitung engagement sebagai persentase realistis dari views, ditambah partisipasi agen dari dalam jaringan simulasi
+      
       let newLikes = Math.round(newViews * (0.02 + Math.random() * 0.06)) + Math.round(activeInfected * 0.8 + exposed * 0.2);
       let newComments = Math.round(newViews * (0.005 + Math.random() * 0.015)) + Math.round(activeInfected * 0.3 + exposed * 0.05);
       let newShares = Math.round(newViews * (0.002 + Math.random() * 0.008)) + Math.round(activeInfected * 0.5);
 
-      // Pastikan total interaksi tidak pernah melebihi views (karena followers agen biasa sangat kecil)
       const totalNewEngagement = newLikes + newComments + newShares;
       if (totalNewEngagement > newViews) {
-          // Jika agen di dalam simulasi menghasilkan banyak interaksi tapi followers mereka sedikit, 
-          // paksa naikkan views minimal sedikit lebih besar dari total engagement.
           newViews = totalNewEngagement + Math.round(totalNewEngagement * (0.1 + Math.random() * 0.3));
       }
 
@@ -163,7 +119,6 @@ const ViralEngine = {
       cumulativeComments += newComments;
       cumulativeShares += newShares;
 
-      // Total Exposed adalah N - S (seluruh agen yang bukan S lagi)
       const totalExposed = N - snap.S;
 
       interactions.push({
@@ -178,32 +133,6 @@ const ViralEngine = {
   }
 };
 
-// ── RNG Helpers ──────────────────────────────────────
-function randNorm(mu, sd) {
-    const u1 = Math.random(), u2 = Math.random();
-    return mu + sd * Math.sqrt(-2 * Math.log(u1 || 1e-10)) * Math.cos(2 * Math.PI * u2);
-}
-
-function randNormClamped(mu, sd, min, max) {
-    return Math.max(min, Math.min(max, randNorm(mu, sd)));
-}
-
-function bernoulli(p) { return Math.random() < p; }
-
-function binomialSample(n, p) {
-    if (n <= 0 || p <= 0) return 0;
-    if (p >= 1) return n;
-    if (n < 40) {
-        let k = 0;
-        for (let i = 0; i < n; i++) if (Math.random() < p) k++;
-        return k;
-    }
-    const mu = n * p, sd = Math.sqrt(n * p * (1 - p));
-    const z = Math.sqrt(-2 * Math.log(Math.random() || 1e-10)) * Math.cos(2 * Math.PI * Math.random());
-    return Math.max(0, Math.min(n, Math.round(mu + sd * z)));
-}
-
-// ── Agent Factory ────────────────────────────────────
 function createAgents(N, muFollower, sdFollower, intelligenceCategory) {
     const agents = [];
     const intCat = INTELLIGENCE_CATEGORIES[intelligenceCategory];
@@ -221,59 +150,42 @@ function createAgents(N, muFollower, sdFollower, intelligenceCategory) {
         agents.push({
             id: i,
             followers,
-            trustScore,       // seberapa mudah percaya konten (0-100)
-            status: 'S',      // S | E | I | R
+            trustScore,
+            status: 'S',
             subState: null,
             infectedDay: -1,
             contacts: 0,
             believed: false,
-            exposedBy: null,            // ID of agent who exposed this agent
-            secondaryInfections: 0,     // Counter for successful secondary infections caused
+            exposedBy: null,
+            secondaryInfections: 0,
         });
     }
     return agents;
 }
 
-// ── Transition probabilities (berdasarkan paper) ─────
-// p(RtR) + p(RtB) + p(RtD) = 1
-// p(DtR) + p(DtF) = 1
-// p(BtR) + p(BtT) + p(BtF) = 1
-// p(TtR) + p(TtT) + p(TtF) = 1
-
 function computeTransProbs(agent, params) {
     const { fypRate, sigma, gamma } = params;
 
-    // Pengaruh murni dari tingkat kepercayaan bawaan agen terhadap konten
     const believeProb = agent.trustScore / 100;
 
     return {
-        // Dari R (Exposed/receiving)
-        pRtR: 1 - fypRate,                  // menolak menerima / tidak FYP
-        pRtB: fypRate * believeProb,        // FYP + percaya → B
-        pRtD: fypRate * (1 - believeProb),  // FYP + tidak percaya → D
-
-        // Dari D (Distrust)
-        pDtR: 0.2,                          // bisa menerima pesan lain lagi
-        pDtF: 0.8,                          // berhenti, tidak menyebarkan
-
-        // Dari B (Believe)
-        pBtT: sigma,                        // menyebarkan (T)
-        pBtR: 0.1,                          // urung, kembali menerima
-        pBtF: Math.max(0, 1 - sigma - 0.1), // final tanpa sebarkan
-
-        // Dari T (Transmitting)
-        pTtT: 1 - gamma,                    // tetap menyebarkan
-        pTtR: gamma * 0.3,                  // kembali menerima
-        pTtF: gamma * 0.7,                  // berhenti sebarkan
+        pRtR: 1 - fypRate,
+        pRtB: fypRate * believeProb,
+        pRtD: fypRate * (1 - believeProb),
+        pDtR: 0.2,
+        pDtF: 0.8,
+        pBtT: sigma,
+        pBtR: 0.1,
+        pBtF: Math.max(0, 1 - sigma - 0.1),
+        pTtT: 1 - gamma,
+        pTtR: gamma * 0.3,
+        pTtF: gamma * 0.7,
     };
 }
 
-// ── Single Step ──────────────────────────────────────
 function stepAgents(agents, params, day) {
     const N = agents.length;
     const I_count = agents.filter(a => a.status === 'I').length;
-
-    // Apply transitions per agen
     const newStatuses = [];
 
     for (const agent of agents) {
@@ -282,11 +194,8 @@ function stepAgents(agents, params, day) {
 
         if (agent.status === 'S') {
             if (I_count > 0) {
-                // kontak_i = expected number of active spreaders this agent follows
                 const kontak_i = agent.followers * (I_count / N);
 
-                // P(terekspos) = 1 - (1 - beta)^kontak_i
-                // beta combines FYP rate and believe probability
                 const believeProb = agent.trustScore / 100;
                 const beta = params.fypRate * believeProb;
 
@@ -302,64 +211,52 @@ function stepAgents(agents, params, day) {
 
         } else if (agent.status === 'E') {
             if (agent.subState === 'R') {
-                // Sub-state R: terima pesan, putuskan
                 const r = Math.random();
                 if (r < tp.pRtB) {
                     next.subState = 'B';
                     next.believed = true;
                 } else if (r < tp.pRtB + tp.pRtD) {
                     next.subState = 'D';
-                    next.status = 'R'; // tidak percaya → R (removed)
+                    next.status = 'R';
                 }
             }
-
-            // Dari B: transisi ke I (Transmitting) atau F (Removed)
             if (next.subState === 'B') {
                 const r2 = Math.random();
                 if (r2 < tp.pBtT) {
                     next.status = 'I';
                     next.subState = 'T';
-                    // Catat sukses infeksi sekunder untuk agen yang mengekspos
                     if (typeof agent.exposedBy === 'number') {
                         agents[agent.exposedBy].secondaryInfections++;
                     }
                 } else if (r2 < tp.pBtT + tp.pBtF) {
-                    next.status = 'R'; // B → F
+                    next.status = 'R';
                     next.subState = 'F';
                 } else {
-                    // pBtR -> kembali menerima (R)
                     next.subState = 'R';
                 }
             }
 
         } else if (agent.status === 'I') {
-            // Sub-state T: menyebarkan
             const r = Math.random();
             if (r < tp.pTtF + tp.pTtR) {
                 next.status = 'R';
                 next.subState = 'F';
             }
-            // else: tetap I (TtT)
         }
-        // R adalah absorbing state
-
         newStatuses.push(next);
     }
 
-    // Apply
     for (let i = 0; i < agents.length; i++) {
         Object.assign(agents[i], newStatuses[i]);
     }
 }
 
-// ── Count states ─────────────────────────────────────
 function countStates(agents) {
     const c = { S: 0, E: 0, I: 0, R: 0 };
     agents.forEach(a => c[a.status]++);
     return c;
 }
 
-// ── Full Simulation (single run) ─────────────────────
 function runSimulation(config) {
     const {
         N, muFollower, sdFollower,
@@ -370,10 +267,8 @@ function runSimulation(config) {
         I0 = 1
     } = config;
 
-    // Poster multiplier (dari tipe akun)
     const pMult = (ACCOUNT_CATEGORIES[posterType]?.mult) || 1.0;
 
-    // Determine FYP rate from category
     let fypRate;
     const fypCat = FYP_CATEGORIES[fypCategory];
     fypRate = fypCat
@@ -384,24 +279,20 @@ function runSimulation(config) {
 
     const agents = createAgents(N, muFollower, sdFollower, intelligenceCategory);
 
-    // Seed I0 spreaders — pilih yang paling banyak follower
     const sorted = [...agents].sort((a, b) => b.followers - a.followers);
     for (let k = 0; k < Math.min(I0, N); k++) {
         sorted[k].status = 'I';
         sorted[k].subState = 'T';
         sorted[k].infectedDay = 0;
-        // The poster gets the specific poster connections, not the ordinary agent connections
         sorted[k].followers = Math.max(0, Math.round(randNorm(posterMuFollower, posterSdFollower)));
     }
 
-    // Initialize history
     for (let i = 0; i < N; i++) {
         agents[i].history = [agents[i].status];
     }
 
     const params = { fypRate: effFyp, sigma, gamma };
 
-    // Timeline
     const timeline = [countStates(agents)];
 
     for (let t = 1; t <= T; t++) {
@@ -410,16 +301,12 @@ function runSimulation(config) {
         const counts = countStates(agents);
         timeline.push(counts);
 
-        // Hentikan simulasi jika sudah tidak ada yang terpapar (E) dan menyebarkan (I)
         if (counts.E === 0 && counts.I === 0) {
             break;
         }
     }
-
-    // ── Kalkulasi Engagement & Velocity (ViralEngine) ──
     const engagementTimeline = ViralEngine.generateEngagementTimeline(timeline, agents, config);
 
-    // Hitung peak engagement & velocity, serta waktu viral & redam
     let peakVelocity = 0;
     let peakER = 0;
     let waktuViral = -1;
@@ -447,10 +334,9 @@ function runSimulation(config) {
         }
         if (evalH.engagementRateRaw > peakER) peakER = evalH.engagementRateRaw;
         
-        // Track waktu viral dan redam
         if (evalH.isViral) {
-            if (waktuViral === -1) waktuViral = h - 1; // index 0 is Day 0
-            waktuRedam = -1; // reset jika kembali viral
+            if (waktuViral === -1) waktuViral = h - 1;
+            waktuRedam = -1;
         } else {
             if (waktuViral !== -1 && waktuRedam === -1) {
                 waktuRedam = h - 1;
@@ -458,14 +344,12 @@ function runSimulation(config) {
         }
     }
 
-    // Evaluasi viralitas secara keseluruhan (berdasarkan performa puncak, bukan saat simulasi sudah padam)
     const viralResult = ViralEngine.evaluateVirality(
         { caption: 'sim' }, 
         engagementTimeline.slice(0, peakHour),
         { velocity: 500, er: 0.05 }
     );
 
-    // Data engagement terakhir (kumulatif)
     const finalEngagement = engagementTimeline[engagementTimeline.length - 1];
     const finalEngagementScore = ViralEngine.calculateEngagementScore(finalEngagement);
 
@@ -485,7 +369,6 @@ function runSimulation(config) {
     };
 }
 
-// ── Monte Carlo (multiple runs, average) ─────────────
 function runMonteCarlo(config, runs = 5) {
     const T = config.T;
     const accS = new Float64Array(T + 1);

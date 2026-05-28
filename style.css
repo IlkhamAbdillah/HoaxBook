@@ -121,8 +121,12 @@ body {
 }
 
 .nav-center {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
-    gap: 4px;
+    justify-content: center;
+    align-items: center;
 }
 
 .nav-tab {
@@ -720,6 +724,7 @@ body {
 .slider-wrap input[type=range] {
     flex: 1;
     -webkit-appearance: none;
+    appearance: none;
     height: 4px;
     border-radius: 2px;
     background: var(--fb-border);
@@ -729,6 +734,7 @@ body {
 
 .slider-wrap input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
+    appearance: none;
     width: 16px;
     height: 16px;
     border-radius: 50%;
@@ -775,20 +781,6 @@ body {
     font-weight: 700;
 }
 
-.pc-audience {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    background: var(--fb-bg);
-    border: 1px solid var(--fb-border);
-    padding: 2px 8px;
-    border-radius: 4px;
-    color: var(--fb-text2);
-    cursor: pointer;
-}
-
 #postCaption {
     width: 100%;
     min-height: 120px;
@@ -799,7 +791,12 @@ body {
     outline: none;
     font-family: 'Inter', sans-serif;
     line-height: 1.5;
-    placeholder-color: var(--fb-text2);
+}
+
+#postCaption::placeholder {
+    color: var(--fb-text2);
+    background: transparent;
+    opacity: 0.5;
 }
 
 .image-upload-area {
@@ -1010,8 +1007,6 @@ body {
     color: #e2e8f0;
 }
 
-.sim-progress-area {}
-
 .spa-label {
     font-size: 9px;
     letter-spacing: .1em;
@@ -1042,8 +1037,6 @@ body {
     color: #64748b;
     font-family: 'IBM Plex Mono', monospace;
 }
-
-.sim-mini-chart {}
 
 .smc-title {
     font-size: 9px;
@@ -1246,8 +1239,6 @@ body {
     margin-bottom: 14px;
 }
 
-.agent-table-wrap {}
-
 .atw-title {
     font-size: 13px;
     font-weight: 700;
@@ -1428,9 +1419,9 @@ body {
 }
 
 .hoax-badge {
-    background: #fef2f2;
-    border: 1px solid #fca5a5;
-    color: #b91c1c;
+    background: var(--fb-bg);
+    border-radius: var(--radius);
+    border: 1px solid var(--fb-border);
     font-size: 11px;
     font-weight: 700;
     padding: 4px 12px;
@@ -1439,6 +1430,18 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+}
+
+.hoax-badge-tidak-viral {
+    background: rgba(219, 234, 254, .5);
+    border-color: rgba(59, 130, 246, .2);
+    color: #0066ff;
+}
+
+.hoax-badge-viral {
+    background: rgba(255, 237, 213, .5);
+    border-color: rgba(249, 115, 22, .25);
+    color: #b91c1c;
 }
 
 /* ── footer buttons ── */
