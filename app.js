@@ -174,7 +174,7 @@ async function runAnimatedSimulation() {
     lastResult = result;
 
     // Build averaged timeline for result charts
-    const avgTimeline = Array.from({ length: config.T + 1 }, (_, t) => ({
+    const avgTimeline = Array.from({ length: result.timeline.length }, (_, t) => ({
         S: mcResult.avg.S[t] ?? result.timeline[t]?.S ?? 0,
         E: mcResult.avg.E[t] ?? result.timeline[t]?.E ?? 0,
         I: mcResult.avg.I[t] ?? result.timeline[t]?.I ?? 0,
@@ -193,7 +193,6 @@ async function runAnimatedSimulation() {
     // ── Open simulation modal & lock it ──
     isSimRunning = true;
     openModal('simModal');
-    $('liveStatsCard').style.display = 'block';
 
     // Params recap
     const posterAgent = result.agents.find(a => a.infectedDay === 0);
@@ -239,12 +238,6 @@ async function runAnimatedSimulation() {
         $('sl-en').textContent = snap.E;
         $('sl-in').textContent = snap.I;
         $('sl-rn').textContent = snap.R;
-
-        // Right-sidebar live stats
-        $('ls-s').textContent = snap.S;
-        $('ls-e').textContent = snap.E;
-        $('ls-i').textContent = snap.I;
-        $('ls-r').textContent = snap.R;
 
         // Update live engagement metrics during simulation
         if (result.hourlyEvaluations[t]) {
