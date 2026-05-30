@@ -143,7 +143,7 @@
                     <div class="hint-title">Belum ada postingan</div>
                     <div class="hint-sub">Atur parameter simulasi lalu buat postingan untuk melihat bagaimana hoax
                         menyebar di jaringan sosial.</div>
-                    <button class="hint-btn" id="openParamsBtn2">⚙️ Atur Parameter</button>
+                    <button class="hint-btn" id="openParamsBtn2">Atur Parameter</button>
                 </div>
 
                 <!-- POST RESULT AREA (appears after sim) -->
@@ -156,14 +156,9 @@
                 <div class="right-card">
                     <div class="rc-title">Tentang Simulasi</div>
                     <div class="rc-body">
-                        <p>Model <strong>ABM-SEIR</strong> berbasis paper Maximov & Shvetcov (IEEE 2024). Setiap agen
-                            adalah netizen dengan distribusi follower <strong>Normal(μ, σ)</strong>.</p>
-                        <div class="rc-states">
-                            <div class="rcs"><span class="dot-s"></span>S — Susceptible</div>
-                            <div class="rcs"><span class="dot-e"></span>E — Exposed</div>
-                            <div class="rcs"><span class="dot-i"></span>I — Infectious (percaya)</div>
-                            <div class="rcs"><span class="dot-r"></span>R — Removed (tidak percaya)</div>
-                        </div>
+                        <p>Model <strong>ABM-SEIR</strong> untuk mensimulasikan penyebaran 
+                            hoax. Setiap agen
+                            adalah netizen yang memiliki follower mengikuti distribusi normal.</p>
                     </div>
                 </div>
 
@@ -243,20 +238,11 @@
                             </div>
                         </div>
                         <div class="pg-item">
-                            <label>σ [P(E→I)]</label>
+                            <label>Seberapa mudah terpengaruh (σ)</label>
                             <div class="slider-wrap">
                                 <input type="range" id="pSigmaEI" min="0.01" max="1" value="0.25" step="0.01">
                                 <input type="number" id="pSigmaEIVal" class="num-input"
                                     style="width:70px; padding:4px; font-size:11px;" value="0.25" min="0.01" max="1"
-                                    step="0.01">
-                            </div>
-                        </div>
-                        <div class="pg-item">
-                            <label>γ [P(I→R)]</label>
-                            <div class="slider-wrap">
-                                <input type="range" id="pGamma" min="0.01" max="1" value="0.67" step="0.01">
-                                <input type="number" id="pGammaVal" class="num-input"
-                                    style="width:70px; padding:4px; font-size:11px;" value="0.67" min="0.01" max="1"
                                     step="0.01">
                             </div>
                         </div>
@@ -267,6 +253,15 @@
                                 <input type="number" id="pRunsVal" class="num-input"
                                     style="width:70px; padding:4px; font-size:11px;" value="5" min="1" max="50"
                                     step="1">
+                            </div>
+                        </div>
+                        <div class="pg-item">
+                            <label>Seberapa mudah menyadari (γ)</label>
+                            <div class="slider-wrap">
+                                <input type="range" id="pGamma" min="0.01" max="1" value="0.67" step="0.01">
+                                <input type="number" id="pGammaVal" class="num-input"
+                                    style="width:70px; padding:4px; font-size:11px;" value="0.67" min="0.01" max="1"
+                                    step="0.01">
                             </div>
                         </div>
                     </div>
@@ -298,7 +293,7 @@
 
                 <div class="modal-footer">
                     <button class="btn-secondary" onclick="closeModal('paramsModal')">Batal</button>
-                    <button class="btn-primary" onclick="saveParams()">💾 Simpan Parameter</button>
+                    <button class="btn-primary" onclick="saveParams()">Simpan Parameter</button>
                 </div>
             </div>
         </div>
@@ -324,10 +319,9 @@
                     </div>
                     <textarea id="postCaption"
                         placeholder="Tuliskan konten hoax yang ingin disimulasikan...&#10;&#10;Contoh: 'BREAKING: Vaksin menyebabkan 5G!'"></textarea>
-                    <div class="image-upload-area" id="imgUploadArea">
+                    <div class="image-upload-area" id="imgUploadArea" onclick="document.getElementById('postImage').click()">
                         <input type="file" id="postImage" accept="image/*" style="display:none">
-                        <div class="img-placeholder" id="imgPlaceholder"
-                            onclick="document.getElementById('postImage').click()">
+                        <div class="img-placeholder" id="imgPlaceholder">
                             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#606770"
                                 stroke-width="1.5">
                                 <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -340,18 +334,10 @@
                         <button class="img-remove" id="imgRemove" style="display:none"
                             onclick="removeImage()">✕</button>
                     </div>
-                    <div class="post-tags">
-                        <div class="tag-label">Tambahkan:</div>
-                        <button class="post-tag-btn" onclick="appendTag('🚨 BREAKING NEWS')">🚨 Breaking</button>
-                        <button class="post-tag-btn" onclick="appendTag('⚠️ WASPADA!')">⚠️ Waspada</button>
-                        <button class="post-tag-btn" onclick="appendTag('🔴 VIRAL!')">🔴 Viral</button>
-                        <button class="post-tag-btn" onclick="appendTag('💊 KESEHATAN')">💊 Kesehatan</button>
-                        <button class="post-tag-btn" onclick="appendTag('🏛️ POLITIK')">🏛️ Politik</button>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn-secondary" onclick="closeModal('postModal')">Batal</button>
-                    <button class="btn-post" id="submitPostBtn" onclick="submitPost()">📤 Posting & Simulasikan</button>
+                    <button class="btn-post" id="submitPostBtn" onclick="submitPost()">Posting & Simulasikan</button>
                 </div>
             </div>
         </div>
@@ -422,14 +408,14 @@
     <div class="modal-overlay" id="resultModal" style="display:none">
         <div class="modal-box modal-result">
             <div class="modal-header">
-                <div class="mh-title" id="resultTitle">📊 Hasil Simulasi</div>
+                <div class="mh-title" id="resultTitle">Hasil Simulasi</div>
                 <button class="modal-close" onclick="closeModal('resultModal')">✕</button>
             </div>
             <div class="modal-body">
 
                 <!-- Verdict banner -->
                 <div class="verdict-banner" id="verdictBanner">
-                    <div class="vb-icon" id="vbIcon">🔥</div>
+                    <div class="vb-icon" id="vbIcon"></div>
                     <div class="vb-text">
                         <strong id="vbTitle">—</strong>
                         <p id="vbDesc">—</p>
@@ -472,8 +458,8 @@
                 <div class="insight-box" id="insightBox"></div>
 
                 <!-- Agent sample table -->
-                <div class="agent-table-wrap">
-                    <div class="atw-title">Sample 15 Agen — Snapshot Akhir</div>
+                <div class="agent-table-wrap" style="margin-bottom: 12px;">
+                    <div class="atw-title">Sample Agen — Snapshot Akhir</div>
                     <div class="table-scroll">
                         <table class="agent-table">
                             <thead>
@@ -492,7 +478,7 @@
 
                 <div class="result-footer">
                     <button class="btn-secondary" onclick="closeModal('resultModal')">Tutup</button>
-                    <button class="btn-primary" onclick="resetSim()">🔄 Simulasi Baru</button>
+                    <button class="btn-primary" onclick="closeModal('resultModal'); openModal('postModal')">Posting lagi</button>
                 </div>
             </div>
         </div>

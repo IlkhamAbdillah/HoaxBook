@@ -809,6 +809,7 @@ body {
     align-items: center;
     justify-content: center;
     transition: border-color .2s;
+    cursor: pointer;
 }
 
 .image-upload-area:hover {
@@ -822,7 +823,6 @@ body {
     gap: 6px;
     color: var(--fb-text2);
     font-size: 13px;
-    cursor: pointer;
     padding: 20px;
 }
 
@@ -1080,7 +1080,7 @@ body {
     border-radius: var(--radius);
     padding: 16px 20px;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 14px;
     margin-bottom: 16px;
     border: 1.5px solid;

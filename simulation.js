@@ -67,7 +67,7 @@ const ViralEngine = {
       verdict = '🔥 VIRAL';
     } 
     else if (wasViralBefore) {
-      verdict = '💎 PADAM';
+      verdict = '💦 PADAM';
     }
 
     return {

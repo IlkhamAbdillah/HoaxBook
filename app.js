@@ -405,12 +405,12 @@ function drawMiniChart(timeline, tNow) {
    SHOW RESULTS — opens result modal, draws charts
    ═══════════════════════════════════════════════════════════ */
 function showResults(result, config, avgTimeline) {
-    const { agents, timeline, viralResult, finalEngagement, finalEngagementScore, peakVelocity, peakER, waktuViral, waktuRedam } = result;
+    const { agents, timeline, viralResult, finalEngagement, finalEngagementScore, peakVelocity, peakER, waktuViral, waktuRedam, engagementTimeline } = result;
     const chartTimeline = avgTimeline || timeline;
     const T = timeline.length - 1;
     const N = config.N;
     const fin = timeline[T];
-    const isV = viralResult.isViral;
+    let isV = false;
     const totExp = N - fin.S;
     const peakI = Math.max(...timeline.map(s => s.I));
     const peakD = timeline.findIndex(s => s.I === peakI);
@@ -418,7 +418,7 @@ function showResults(result, config, avgTimeline) {
 
     // ── Verdict banner ──
     let verdictClass = 'verdict-tidak-viral';
-    let verdictIcon = '🛡️';
+    let verdictIcon = '🦗';
     let verdictTitle = 'TIDAK VIRAL';
     let verdictDesc = '';
 
@@ -426,6 +426,7 @@ function showResults(result, config, avgTimeline) {
         verdictClass = 'verdict-viral';
         verdictIcon = '🔥';
         verdictTitle = 'VIRAL';
+        isV = true;
         
         if (waktuRedam !== -1) {
             verdictDesc = `<b>Mulai Viral: Hari ke-${waktuViral}</b><br><b>Mulai Padam: Hari ke-${waktuRedam}</b>`;
@@ -449,18 +450,25 @@ function showResults(result, config, avgTimeline) {
     $('rm-shares').textContent = fmt(finalEngagement.shares);
 
     // ── Insight ──
+    const peakEng = engagementTimeline[peakD] || { views: 0, likes: 0, comments: 0, shares: 0 };
+    const prevEng = peakD > 0 ? (engagementTimeline[peakD - 1] || { views: 0, likes: 0, comments: 0, shares: 0 }) : { views: 0, likes: 0, comments: 0, shares: 0 };
+    const dailyViews = Math.max(0, peakEng.views - prevEng.views);
+    const dailyLikes = Math.max(0, peakEng.likes - prevEng.likes);
+    const dailyComments = Math.max(0, peakEng.comments - prevEng.comments);
+    const dailyShares = Math.max(0, peakEng.shares - prevEng.shares);
+    const dailyER = dailyViews > 0 ? ((dailyLikes + dailyComments + dailyShares) / dailyViews * 100).toFixed(2) : 0;
+
     $('insightBox').innerHTML = `
-    <strong style="display:block;margin-bottom:6px">💡 Insight Analitik</strong>
-    Puncak penyebar aktif (I) sebanyak <strong>${fmt(peakI)} agen</strong> terjadi
-    pada hari ke-<strong>${peakD}</strong>.
-    Total <strong>${fmt(finalEngagement.views)}</strong> views, 
-    <strong>${fmt(finalEngagement.likes)}</strong> likes,
-    <strong>${fmt(finalEngagement.comments)}</strong> komentar,
-    <strong>${fmt(finalEngagement.shares)}</strong> shares.
-    Engagement Score akhir: <strong>${fmt(Math.round(finalEngagementScore))}</strong>.
+    <strong style="display:block;margin-bottom:6px">💡 Insight</strong>
+    Penyebaran mencapai puncak dengan jumlah penyebar aktif sebanyak <strong>${fmt(peakI)} agen</strong> pada hari ke-<strong>${peakD}</strong>. Pada hari tersebut, terdapat penambahan 
+    <strong>${fmt(dailyViews)}</strong> views, 
+    <strong>${fmt(dailyLikes)}</strong> likes,
+    <strong>${fmt(dailyComments)}</strong> komentar, dan
+    <strong>${fmt(dailyShares)}</strong> shares, serta
+    memiliki engagement rate sebesar <strong>${dailyER}%</strong>.
     ${isV
-            ? 'Konten mencapai akselerasi algoritma — velocity dan engagement rate melampaui threshold platform. Agen dengan follower tinggi berperan sebagai <em>super-spreader</em>.'
-            : 'Konten gagal mencapai threshold viralitas. Rantai penyebaran terputus sebelum mencapai momentum yang cukup untuk akselerasi algoritma.'}`;
+            ? 'Konten menjadi viral karena berhasil mendapat lebih dari 500 views dan memiliki engagement rate lebih dari 5% dalam satu hari.'
+            : 'Konten gagal menjadi viral. Penyebaran berhenti sebelum mendapatkan perhatian yang cukup dari pengguna lain.'}`;
 
     // ── Agent table ──
     populateAgentTable(agents);
@@ -476,7 +484,7 @@ function showResults(result, config, avgTimeline) {
     createFeedCard(result, config);
 
     // ── UI updates ──
-    $('openResultBtn').style.display = 'block';
+    $('openResultBtn').style.display = 'flex';
     $('notifDot').style.display = 'block';
     setTimeout(() => $('notifDot').style.display = 'none', 5000);
 }
@@ -489,7 +497,7 @@ function drawResultSEIR(timeline) {
     const svg = d3.select(svgEl);
     svg.selectAll('*').remove();
 
-    const m = { t: 10, r: 15, b: 28, l: 38 };
+    const m = { t: 10, r: 15, b: 36, l: 44 };
     const bw = svgEl.getBoundingClientRect().width;
     const W = (bw || 380) - m.l - m.r;
     const H = 200 - m.t - m.b;
@@ -516,6 +524,24 @@ function drawResultSEIR(timeline) {
         .selectAll('text').attr('fill', axFont.fill).attr('font-size', axFont['font-size']);
     svg.selectAll('.domain').attr('stroke', '#cbd5e1');
     svg.selectAll('.tick line').attr('stroke', '#e2e8f0');
+
+    // Axis labels
+    g.append('text')
+        .attr('x', W / 2)
+        .attr('y', H + 32)
+        .attr('text-anchor', 'middle')
+        .attr('fill', axFont.fill)
+        .attr('font-size', '10px')
+        .text('Jumlah Hari');
+
+    g.append('text')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -H / 2)
+        .attr('y', -32)
+        .attr('text-anchor', 'middle')
+        .attr('fill', axFont.fill)
+        .attr('font-size', '10px')
+        .text('Jumlah Agen');
 
     // Area + Line per status
     ['S', 'E', 'I', 'R'].forEach(key => {
@@ -549,7 +575,7 @@ function drawResultDist(agents) {
     const svg = d3.select(svgEl);
     svg.selectAll('*').remove();
 
-    const m = { t: 10, r: 15, b: 28, l: 38 };
+    const m = { t: 10, r: 15, b: 36, l: 44 };
     const bw = svgEl.getBoundingClientRect().width;
     const W = (bw || 380) - m.l - m.r;
     const H = 200 - m.t - m.b;
@@ -592,6 +618,25 @@ function drawResultDist(agents) {
         .selectAll('text').attr('fill', '#64748b').attr('font-size', '9px');
     svg.selectAll('.domain').attr('stroke', '#cbd5e1');
     svg.selectAll('.tick line').attr('stroke', '#e2e8f0');
+
+    // Axis labels
+    const axFont = { fill: '#64748b', 'font-size': '10px', 'font-family': "'IBM Plex Mono',monospace" };
+    g.append('text')
+        .attr('x', W / 2)
+        .attr('y', H + 32)
+        .attr('text-anchor', 'middle')
+        .attr('fill', axFont.fill)
+        .attr('font-size', '10px')
+        .text('Jumlah Follower');
+
+    g.append('text')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -H / 2)
+        .attr('y', -32)
+        .attr('text-anchor', 'middle')
+        .attr('fill', axFont.fill)
+        .attr('font-size', '10px')
+        .text('Jumlah Agen');
 
     // Stacked bars
     binData.forEach((bin, i) => {
@@ -693,17 +738,6 @@ function escapeHtml(str) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   RESET
-   ═══════════════════════════════════════════════════════════ */
-function resetSim() {
-    closeModal('resultModal');
-    lastResult = null;
-    lastPostData = null;
-    $('postCaption').value = '';
-    removeImage();
-}
-
-/* ═══════════════════════════════════════════════════════════
    EVENT LISTENERS — wired on DOMContentLoaded
    ═══════════════════════════════════════════════════════════ */
 function syncInput(rangeId, numId, defaultVal) {
@@ -756,6 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('openPostModalBtn').addEventListener('click', openPost);
     $('openPostModalBtn2').addEventListener('click', openPost);
     $('openPostModalBtn3').addEventListener('click', openPost);
+
 
     // ── Open result modal ──
     $('openResultBtn').addEventListener('click', () => {
