@@ -203,14 +203,14 @@ function stepAgents(agents, params, day) {
 
                 if (Math.random() < pTerekspos) {
                     next.status = 'E';
-                    next.subState = 'R';
+                    next.subState = 'Re';
                     next.infectedDay = day;
                     next.exposedBy = 'network';
                 }
             }
 
         } else if (agent.status === 'E') {
-            if (agent.subState === 'R') {
+            if (agent.subState === 'Re') {
                 const r = Math.random();
                 if (r < tp.pRtB) {
                     next.subState = 'B';
@@ -232,7 +232,7 @@ function stepAgents(agents, params, day) {
                     next.status = 'R';
                     next.subState = 'F';
                 } else {
-                    next.subState = 'R';
+                    next.subState = 'Re';
                 }
             }
 
