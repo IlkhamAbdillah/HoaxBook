@@ -460,7 +460,7 @@ function showResults(result, config, avgTimeline) {
 
     $('insightBox').innerHTML = `
     <strong style="display:block;margin-bottom:6px">💡 Insight</strong>
-    Penyebaran mencapai puncak dengan jumlah penyebar aktif sebanyak <strong>${fmt(peakI)} agen</strong> pada hari ke-<strong>${peakD}</strong>. Pada hari tersebut, terdapat penambahan 
+    Penyebaran mencapai puncak dengan jumlah penyebar aktif sebanyak <strong>${fmt(peakI)} netizen</strong> pada hari ke-<strong>${peakD}</strong>. Pada hari tersebut, terdapat penambahan 
     <strong>${fmt(dailyViews)}</strong> views, 
     <strong>${fmt(dailyLikes)}</strong> likes,
     <strong>${fmt(dailyComments)}</strong> komentar, dan
@@ -541,7 +541,7 @@ function drawResultSEIR(timeline) {
         .attr('text-anchor', 'middle')
         .attr('fill', axFont.fill)
         .attr('font-size', '10px')
-        .text('Jumlah Agen');
+        .text('Jumlah Netizen');
 
     // Area + Line per status
     ['S', 'E', 'I', 'R'].forEach(key => {
@@ -636,7 +636,7 @@ function drawResultDist(agents) {
         .attr('text-anchor', 'middle')
         .attr('fill', axFont.fill)
         .attr('font-size', '10px')
-        .text('Jumlah Agen');
+        .text('Jumlah Netizen');
 
     // Stacked bars
     binData.forEach((bin, i) => {

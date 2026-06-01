@@ -559,6 +559,7 @@ body {
 .rc-ref {
     font-style: italic;
     font-size: 12px;
+    margin-bottom: 8px;
 }
 
 /* ══════════════ MODALS ══════════════ */

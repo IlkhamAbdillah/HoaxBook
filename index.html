@@ -85,7 +85,7 @@
                     <div class="ps-row"><span>Platform</span><span id="ps-platform" class="ps-val">—</span></div>
                     <div class="ps-row"><span>FYP Rate</span><span id="ps-fyp" class="ps-val">—</span></div>
                     <div class="ps-row"><span>Kecerdasan</span><span id="ps-int" class="ps-val">—</span></div>
-                    <div class="ps-row"><span>Agen (N)</span><span id="ps-n" class="ps-val">—</span></div>
+                    <div class="ps-row"><span>Jumlah Netizen (N)</span><span id="ps-n" class="ps-val">—</span></div>
                     <div class="ps-row"><span>Jumlah Simulasi</span><span id="ps-runs" class="ps-val">—</span></div>
                 </div>
                 <div class="param-summary" id="paramSummary">
@@ -157,16 +157,24 @@
                     <div class="rc-title">Tentang Simulasi</div>
                     <div class="rc-body">
                         <p>Model <strong>ABM-SEIR</strong> untuk mensimulasikan penyebaran 
-                            hoax. Setiap agen
-                            adalah netizen yang memiliki follower mengikuti distribusi normal.</p>
+                            hoax. Setiap netizen
+                            adalah agen yang memiliki follower mengikuti distribusi normal.</p>
                     </div>
                 </div>
 
                 <div class="right-card">
                     <div class="rc-title">Referensi</div>
                     <div class="rc-body rc-ref">
-                        Maximov, A. & Shvetcov, A. (2024). <em>Modeling the Processes of Distribution of Disinformation
-                            in the Internet Environment.</em> IEEE Inforino. DOI: 10.1109/Inforino60363.2024.10551960
+                        1. Yu, Z., Luan, S., & State, K. (2020). <em>Stability analysis of a SAIR rumor spreading
+                                model with control strategies in online social networks.</em> Information Sciences, 526, 1-18. DOI: 10.1016/j.ins.2020.03.076
+                    </div>
+                    <div class="rc-body rc-ref">
+                        2. Maximov, A. & Shvetcov, A. (2024). <em>Modeling the Processes of Distribution of
+                                Disinformation
+                                in the Internet Environment.</em> IEEE Inforino. DOI: 10.1109/Inforino60363.2024.10551960
+                    </div>
+                    <div class="rc-body rc-ref">
+                        3. RevoU. (n.d.). <em>Engagement Rate: Pengertian, Rumus, dan Cara Meningkatkannya.</em>  RevoU Kosakata.
                     </div>
                 </div>
             </aside>
@@ -230,7 +238,7 @@
                     <div class="psec-label">Parameter Jaringan</div>
                     <div class="param-grid">
                         <div class="pg-item">
-                            <label>Jumlah Agen (N)</label>
+                            <label>Jumlah Netizen (N)</label>
                             <div class="slider-wrap">
                                 <input type="range" id="pN" min="50" max="500" value="150" step="1">
                                 <input type="number" id="pNVal" class="num-input"
@@ -395,7 +403,7 @@
                         <div class="spr-title">Parameter</div>
                         <div class="spr-row"><span>Tipe Akun</span><strong id="spr-poster">—</strong></div>
                         <div class="spr-row"><span>Platform</span><strong id="spr-platform">—</strong></div>
-                        <div class="spr-row"><span>Koneksi Poster</span><strong id="spr-conn">—</strong></div>
+                        <div class="spr-row"><span>Follower Poster</span><strong id="spr-conn">—</strong></div>
                         <div class="spr-row"><span>FYP rate</span><strong id="spr-fyp">—</strong></div>
                         <div class="spr-row"><span>Verdict</span><strong id="spr-verdict" style="font-size:10px;max-width:140px;text-align:right;line-height:1.3">—</strong></div>
                     </div>
@@ -449,7 +457,7 @@
                         <svg id="resultChartSEIR" width="100%" height="200"></svg>
                     </div>
                     <div class="rc-chart-card">
-                        <div class="rcc-title">Distribusi Follower Agen</div>
+                        <div class="rcc-title">Distribusi Follower Netizen</div>
                         <svg id="resultChartDist" width="100%" height="200"></svg>
                     </div>
                 </div>
@@ -459,14 +467,14 @@
 
                 <!-- Agent sample table -->
                 <div class="agent-table-wrap" style="margin-bottom: 12px;">
-                    <div class="atw-title">Sample Agen — Snapshot Akhir</div>
+                    <div class="atw-title">Sample Netizen — Hasil Akhir</div>
                     <div class="table-scroll">
                         <table class="agent-table">
                             <thead>
                                 <tr>
                                     <th>#ID</th>
                                     <th>Trust Score</th>
-                                    <th>Koneksi</th>
+                                    <th>Follower</th>
                                     <th>Status Akhir</th>
                                     <th>Hari Percaya</th>
                                 </tr>
