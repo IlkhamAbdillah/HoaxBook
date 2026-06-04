@@ -27,22 +27,7 @@ const ACCOUNT_CATEGORIES = {
     influencer: { mult: 3.0, label: 'Influencer' },
 };
 
-const TRUST_THRESHOLD = 50;
-
 const ViralEngine = {
-  WEIGHTS: {
-    like: 1.0,
-    comment: 2.5,
-    share: 4.0
-  },
-
-  calculateEngagementScore(actions) {
-    const { likes, comments, shares } = actions;
-    return (likes * this.WEIGHTS.like) + 
-           (comments * this.WEIGHTS.comment) + 
-           (shares * this.WEIGHTS.share);
-  },
-
   evaluateVirality(post, timelineInteractions, threshold = { velocity: 500, er: 0.05 }, wasViralBefore = false) {
     const currentHour = timelineInteractions.length;
     if (currentHour === 0) return { isViral: false, status: 'Draft/Baru', verdict: 'TIDAK VIRAL' };
@@ -52,8 +37,6 @@ const ViralEngine = {
     const viewVelocity = latestData.views - previousData.views;
     const totalEngagement = latestData.likes + latestData.comments + latestData.shares;
     const engagementRate = latestData.views > 0 ? (totalEngagement / latestData.views) : 0;
-
-    const engagementScore = this.calculateEngagementScore(latestData);
     
     let isViral = false;
     if (currentHour > 1) {
@@ -75,7 +58,6 @@ const ViralEngine = {
       viewVelocityPerHour: viewVelocity,
       engagementRate: parseFloat((engagementRate * 100).toFixed(2)) + '%',
       engagementRateRaw: engagementRate,
-      engagementScore: engagementScore,
       isViral: isViral,
       verdict: verdict
     };
@@ -169,17 +151,11 @@ function computeTransProbs(agent, params) {
     const believeProb = agent.trustScore / 100;
 
     return {
-        pRtR: 1 - fypRate,
-        pRtB: fypRate * believeProb,
-        pRtD: fypRate * (1 - believeProb),
-        pDtR: 0.2,
-        pDtF: 0.8,
-        pBtT: sigma,
-        pBtR: 0.1,
-        pBtF: Math.max(0, 1 - sigma - 0.1),
-        pTtT: 1 - gamma,
-        pTtR: gamma * 0.3,
-        pTtF: gamma * 0.7,
+        pRetB: fypRate * believeProb,
+        pRetD: fypRate * (1 - believeProb),
+        pBtI: sigma,
+        pBtR: Math.max(0, 1 - sigma - 0.1),
+        pTtR: gamma,
     };
 }
 
@@ -212,23 +188,23 @@ function stepAgents(agents, params, day) {
         } else if (agent.status === 'E') {
             if (agent.subState === 'Re') {
                 const r = Math.random();
-                if (r < tp.pRtB) {
+                if (r < tp.pRetB) {
                     next.subState = 'B';
                     next.believed = true;
-                } else if (r < tp.pRtB + tp.pRtD) {
+                } else if (r < tp.pRetB + tp.pRetD) {
                     next.subState = 'D';
                     next.status = 'R';
                 }
             }
             if (next.subState === 'B') {
                 const r2 = Math.random();
-                if (r2 < tp.pBtT) {
+                if (r2 < tp.pBtI) {
                     next.status = 'I';
                     next.subState = 'T';
                     if (typeof agent.exposedBy === 'number') {
                         agents[agent.exposedBy].secondaryInfections++;
                     }
-                } else if (r2 < tp.pBtT + tp.pBtF) {
+                } else if (r2 < tp.pBtI + tp.pBtR) {
                     next.status = 'R';
                     next.subState = 'F';
                 } else {
@@ -238,7 +214,7 @@ function stepAgents(agents, params, day) {
 
         } else if (agent.status === 'I') {
             const r = Math.random();
-            if (r < tp.pTtF + tp.pTtR) {
+            if (r < tp.pTtR) {
                 next.status = 'R';
                 next.subState = 'F';
             }
@@ -351,7 +327,6 @@ function runSimulation(config) {
     );
 
     const finalEngagement = engagementTimeline[engagementTimeline.length - 1];
-    const finalEngagementScore = ViralEngine.calculateEngagementScore(finalEngagement);
 
     return {
         agents, timeline,
@@ -359,7 +334,6 @@ function runSimulation(config) {
         engagementTimeline,
         hourlyEvaluations,
         finalEngagement,
-        finalEngagementScore,
         peakVelocity,
         peakER,
         waktuViral,
