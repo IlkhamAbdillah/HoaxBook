@@ -2,11 +2,13 @@
 
 HoaxBook is a static web application for simulating the spread of hoaxes in a social network using an ABM-SEIR approach. The app presents posting flow, propagation to other users, network visualization, and simulation summaries in a social-media-style interface.
 
-## Video Preview
+## Preview
 
-<video src="doksli/Final.mp4" controls autoplay muted loop playsinline width="100%">
-	Your browser does not support embedded video. You can open the preview video directly from <a href="doksli/Final.mp4">doksli/Final.mp4</a>.
-</video>
+<img src="doksli/menu.png" alt="Menu preview" width="100%">
+
+<img src="doksli/simulation.png" alt="Simulation preview" width="100%">
+
+<img src="doksli/result.png" alt="Result preview" width="100%">
 
 ## Main Features
 
